@@ -2,7 +2,9 @@
 
 <a href="https://github.com/jik-lang/jik-packages/actions/workflows/test.yml"><img alt="Test" src="https://github.com/jik-lang/jik-packages/actions/workflows/test.yml/badge.svg?branch=main"></a>
 
-Official packages for the Jik programming language.
+Official packages for the [Jik programming language](https://jik-lang.org).
+
+The Jik compiler and command-line toolchain can be found [here](https://github.com/jik-lang/jik).
 
 ## Compatibility
 
