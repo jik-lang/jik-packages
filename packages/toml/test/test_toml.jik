@@ -31,7 +31,7 @@ end
 func test_empty_document(ts):
     doc := must toml::parse("", _)
     test::suite_assert(ts, len(doc.root) == 0, site())
-    test::suite_assert(ts, len(doc.tables) == 1, site())
+    test::suite_assert(ts, len(doc.tables) == 0, site())
 end
 
 func test_blank_lines(ts):
