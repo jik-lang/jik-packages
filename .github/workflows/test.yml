@@ -27,14 +27,24 @@ jobs:
           extract_dir="$RUNNER_TEMP/jik-extract"
           mkdir -p "$release_dir" "$extract_dir"
 
-          gh release download --repo jik-lang/jik --dir "$release_dir" --clobber
+          gh release download --repo jik-lang/jik --pattern '*' --dir "$release_dir" --clobber
 
           asset="$(
             find "$release_dir" -maxdepth 1 -type f \
-              | grep -Ei 'linux|ubuntu|x86_64|amd64' \
+              | grep -Ei 'linux|ubuntu' \
+              | grep -Ei 'x86_64|amd64|x64' \
               | head -n 1 \
               || true
           )"
+
+          if [ -z "$asset" ]; then
+            asset="$(
+              find "$release_dir" -maxdepth 1 -type f \
+                | grep -Ei 'linux|ubuntu' \
+                | head -n 1 \
+                || true
+            )"
+          fi
 
           if [ -z "$asset" ]; then
             echo "::error::Latest jik-lang/jik release has no Linux release asset."
