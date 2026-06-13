@@ -1,0 +1,281 @@
+//! Small TOML parser.
+//!
+//! Supported subset:
+//! - table headers such as `[server]`
+//! - unquoted keys made of ASCII letters, digits, `_`, and `-`
+//! - integer, string, and boolean values
+//! - basic string escapes: `\b`, `\t`, `\n`, `\f`, `\r`, `\"`, and `\\`
+//! - blank lines and `#` comments outside strings
+
+use "jik/char"
+use "jik/strbuf"
+use "jik/string"
+
+
+// -------------------------------------------------------------
+//      Types
+// -------------------------------------------------------------
+
+
+/// Parsed TOML value.
+///
+/// Supported value types are integers, strings, and booleans.
+variant TomlValue:
+    INT: int
+    STRING: String
+    BOOL: bool
+end
+
+/// Parsed TOML document.
+///
+/// Root assignments are stored in `root`. Table assignments are stored in
+/// `tables`, keyed first by table name and then by value key.
+struct TomlDocument:
+    root: Dict[TomlValue]
+    tables: Dict[Dict[TomlValue]]
+end
+
+
+// -------------------------------------------------------------
+//      Helpers
+// -------------------------------------------------------------
+
+
+struct _KeyValue:
+    key: String
+    value: String
+end
+
+
+func _is_key_char(ch: char) -> bool:
+    if char::isalnum(ch):
+        return true
+    elif ch == '_' or ch == '-':
+        return true
+    end
+    return false
+end
+
+func _valid_key(foreign key: String) -> bool:
+    if len(key) == 0:
+        return false
+    end
+
+    for i = 0, len(key):
+        if not _is_key_char(key[i]):
+            return false
+        end
+    end
+    return true
+end
+
+func _is_escaped(foreign text: String, idx: int) -> bool:
+    count := 0
+    i := idx - 1
+    while i >= 0 and text[i] == '\\':
+        count += 1
+        i -= 1
+    end
+    return count % 2 == 1
+end
+
+throws func _parse_header(line: String) -> String:
+    n := len(line)
+    if n < 2:
+        fail("toml: invalid table header")
+    end
+    if line[0] != '[' or line[n - 1] != ']':
+        fail("toml: invalid table header")
+    end
+
+    name := string::trim(must string::slice(line, 1, n - 1, .line), .line)
+    if not _valid_key(name):
+        fail("toml: invalid table name")
+    end
+    return name
+end
+
+func _strip_comment(line: String) -> String:
+    in_string := false
+    for i = 0, len(line):
+        ch := line[i]
+        if ch == '"' and not _is_escaped(line, i):
+            in_string = not in_string
+        elif ch == '#' and not in_string:
+            return must string::slice(line, 0, i, .line)
+        end
+    end
+    return line
+end
+
+throws func _split_assignment(line: String) -> _KeyValue:
+    eq_idx := -1
+    in_string := false
+    for i = 0, len(line):
+        ch := line[i]
+        if ch == '"' and not _is_escaped(line, i):
+            in_string = not in_string
+        elif ch == '=' and not in_string:
+            if eq_idx != -1:
+                fail("toml: repeated assignment separator")
+            end
+            eq_idx = i
+        end
+    end
+
+    if eq_idx == -1:
+        fail("toml: missing assignment separator")
+    end
+
+    key := string::trim(must string::slice(line, 0, eq_idx, .line), .line)
+    value := string::trim(must string::slice(line, eq_idx + 1, len(line), .line), .line)
+
+    if not _valid_key(key):
+        fail("toml: invalid key")
+    end
+    if len(value) == 0:
+        fail("toml: missing value")
+    end
+
+    return _KeyValue{
+        key = key,
+        value = value
+    }[.line]
+end
+
+throws func _parse_string_value(foreign value: String, r: Region) -> TomlValue:
+    n := len(value)
+    if n < 2 or value[0] != '"' or value[n - 1] != '"':
+        fail("toml: invalid string value")
+    end
+
+    sb := strbuf::new("", r)
+    i := 1
+    while i < n - 1:
+        ch := value[i]
+        if ch == '"':
+            fail("toml: invalid string value")
+        elif ch == '\\':
+            i += 1
+            if i >= n - 1:
+                fail("toml: invalid escape sequence")
+            end
+
+            esc := value[i]
+            if esc == 'b':
+                strbuf::append_char(sb, '\x08')
+            elif esc == 't':
+                strbuf::append_char(sb, '\t')
+            elif esc == 'n':
+                strbuf::append_char(sb, '\n')
+            elif esc == 'f':
+                strbuf::append_char(sb, '\x0c')
+            elif esc == 'r':
+                strbuf::append_char(sb, '\r')
+            elif esc == '"':
+                strbuf::append_char(sb, '"')
+            elif esc == '\\':
+                strbuf::append_char(sb, '\\')
+            else:
+                fail("toml: unknown escape sequence")
+            end
+        else:
+            strbuf::append_char(sb, ch)
+        end
+        i += 1
+    end
+
+    text := strbuf::to_string(sb, r)
+    return TomlValue.STRING{text}[r]
+end
+
+throws func _parse_value(foreign value: String, r: Region) -> TomlValue:
+    if value == "true":
+        return TomlValue.BOOL{true}[r]
+    elif value == "false":
+        return TomlValue.BOOL{false}[r]
+    elif len(value) > 0 and value[0] == '"':
+        try text := _parse_string_value(value, r):
+            return text
+        except:
+            fail(error_msg(r), error_code())
+        end
+    end
+
+    try n := string::to_int(value):
+        return TomlValue.INT{n}[r]
+    except:
+        fail("toml: unknown value")
+    end
+end
+
+throws func _store_value(doc: TomlDocument, foreign table_name: String, foreign key: String, value: TomlValue):
+    if len(table_name) > 0:
+        table := doc.tables[table_name]?
+        if table[key] is Some:
+            fail("toml: duplicate key")
+        end
+        table[key] = value
+    else:
+        if doc.root[key] is Some:
+            fail("toml: duplicate key")
+        end
+        doc.root[key] = value
+    end
+end
+
+
+// -------------------------------------------------------------
+//      API
+// -------------------------------------------------------------
+
+
+/// Parse TOML source into a document.
+///
+/// Unsupported TOML forms return a parse error.
+///
+/// @param src TOML source text.
+/// @param r Allocation region for the returned document.
+/// @returns Parsed TOML document.
+throws func parse(foreign src: String, r: Region) -> TomlDocument:
+    doc := TomlDocument{}[r]
+    current_table := ""
+    lines := string::split(src, "\n", _)
+
+    for raw in lines:
+        without_comment := _strip_comment(raw)
+        line := string::trim(without_comment, _)
+
+        if len(line) == 0:
+            continue
+        end
+
+        if line[0] == '[':
+            try table_name := _parse_header(line):
+                if doc.tables[table_name] is Some:
+                    fail("toml: duplicate table header")
+                end
+                table: Dict[TomlValue][r]
+                doc.tables[table_name] = table
+                current_table = table_name
+            except:
+                fail(error_msg(r), error_code())
+            end
+        else:
+            try assignment := _split_assignment(line):
+                try value := _parse_value(assignment.value, r):
+                    try _store_value(doc, current_table, assignment.key, value):
+                    except:
+                        fail(error_msg(r), error_code())
+                    end
+                except:
+                    fail(error_msg(r), error_code())
+                end
+            except:
+                fail(error_msg(r), error_code())
+            end
+        end
+    end
+
+    return doc
+end

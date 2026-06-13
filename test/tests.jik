@@ -1,0 +1,9 @@
+use "jik/testing" as test
+use "../packages/toml/test/test_toml" as toml_tests
+
+
+func main():
+    ts := test::suite_new(_)
+    toml_tests::run_tests(ts)
+    test::suite_finish(ts)
+end

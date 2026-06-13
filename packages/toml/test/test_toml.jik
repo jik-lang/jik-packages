@@ -1,0 +1,134 @@
+use "jik/testing" as test
+use "../src/toml"
+
+
+func _assert_int(ts, foreign value: Option[toml::TomlValue], expected: int):
+    test::suite_assert(ts, value is Some, site())
+    test::suite_assert(ts, value? is toml::TomlValue.INT, site())
+    test::suite_assert(ts, value?[toml::TomlValue.INT] == expected, site())
+end
+
+func _assert_string(ts, foreign value: Option[toml::TomlValue], foreign expected: String):
+    test::suite_assert(ts, value is Some, site())
+    test::suite_assert(ts, value? is toml::TomlValue.STRING, site())
+    test::suite_assert(ts, value?[toml::TomlValue.STRING] == expected, site())
+end
+
+func _assert_bool(ts, foreign value: Option[toml::TomlValue], expected: bool):
+    test::suite_assert(ts, value is Some, site())
+    test::suite_assert(ts, value? is toml::TomlValue.BOOL, site())
+    test::suite_assert(ts, value?[toml::TomlValue.BOOL] == expected, site())
+end
+
+func _assert_parse_fails(ts, foreign src: String):
+    try doc := toml::parse(src, _):
+        test::suite_assert(ts, false, site())
+    except:
+        test::suite_assert(ts, true, site())
+    end
+end
+
+func test_empty_document(ts):
+    doc := must toml::parse("", _)
+    test::suite_assert(ts, len(doc.root) == 0, site())
+    test::suite_assert(ts, len(doc.tables) == 0, site())
+end
+
+func test_blank_lines(ts):
+    doc := must toml::parse("\n\nport = 8080\n\nready = true\n\n", _)
+    _assert_int(ts, doc.root["port"], 8080)
+    _assert_bool(ts, doc.root["ready"], true)
+end
+
+func test_root_values(ts):
+    doc := must toml::parse("port = 8080\nhost = \"localhost\"\nready = false", _)
+    _assert_int(ts, doc.root["port"], 8080)
+    _assert_string(ts, doc.root["host"], "localhost")
+    _assert_bool(ts, doc.root["ready"], false)
+end
+
+func test_whitespace(ts):
+    doc := must toml::parse("  port   =   -42  \n[ server ]\n  host = \"localhost\"  ", _)
+    _assert_int(ts, doc.root["port"], -42)
+    _assert_string(ts, doc.tables["server"]?["host"], "localhost")
+end
+
+func test_comments(ts):
+    src := "# config\nport = 8080 # local port\n[server] # main table\nhost = \"local#host\"\n"
+    doc := must toml::parse(src, _)
+    _assert_int(ts, doc.root["port"], 8080)
+    _assert_string(ts, doc.tables["server"]?["host"], "local#host")
+end
+
+func test_assignment_separator_in_string(ts):
+    doc := must toml::parse("expr = \"a=b\"\n[server]\nurl = \"http://localhost?a=b\"", _)
+    _assert_string(ts, doc.root["expr"], "a=b")
+    _assert_string(ts, doc.tables["server"]?["url"], "http://localhost?a=b")
+end
+
+func test_string_escape_sequences(ts):
+    src := "quote = \"say \\\"hello\\\" # still text\"\npath = \"C:\\\\tmp\"\nline = \"a\\nb\\tend\"\nctrl = \"\\b\\f\\r\"\nexpr = \"a\\\"=\\\"b\""
+    doc := must toml::parse(src, _)
+    _assert_string(ts, doc.root["quote"], "say \"hello\" # still text")
+    _assert_string(ts, doc.root["path"], "C:\\tmp")
+    _assert_string(ts, doc.root["line"], "a\nb\tend")
+    _assert_string(ts, doc.root["ctrl"], "\x08\x0c\r")
+    _assert_string(ts, doc.root["expr"], "a\"=\"b")
+end
+
+func test_table_values(ts):
+    doc := must toml::parse("[server]\nport = 8080\nhost = \"localhost\"\nsecure = true", _)
+    _assert_int(ts, doc.tables["server"]?["port"], 8080)
+    _assert_string(ts, doc.tables["server"]?["host"], "localhost")
+    _assert_bool(ts, doc.tables["server"]?["secure"], true)
+end
+
+func test_multiple_tables(ts):
+    src := "[server]\nhost = \"localhost\"\n[client]\nhost = \"remote\"\nport = 9000"
+    doc := must toml::parse(src, _)
+    _assert_string(ts, doc.tables["server"]?["host"], "localhost")
+    _assert_string(ts, doc.tables["client"]?["host"], "remote")
+    _assert_int(ts, doc.tables["client"]?["port"], 9000)
+end
+
+func test_same_key_different_scopes(ts):
+    doc := must toml::parse("host = \"root\"\n[server]\nhost = \"localhost\"\n[client]\nhost = \"remote\"", _)
+    _assert_string(ts, doc.root["host"], "root")
+    _assert_string(ts, doc.tables["server"]?["host"], "localhost")
+    _assert_string(ts, doc.tables["client"]?["host"], "remote")
+end
+
+func test_failures(ts):
+    _assert_parse_fails(ts, "[server")
+    _assert_parse_fails(ts, "[]")
+    _assert_parse_fails(ts, "server.host = \"localhost\"")
+    _assert_parse_fails(ts, "\"host\" = \"localhost\"")
+    _assert_parse_fails(ts, "host =")
+    _assert_parse_fails(ts, "= true")
+    _assert_parse_fails(ts, "host = localhost")
+    _assert_parse_fails(ts, "host = \"local\\qhost\"")
+    _assert_parse_fails(ts, "host = \"a\"\nhost = \"b\"")
+    _assert_parse_fails(ts, "[server]\nhost = \"a\"\nhost = \"b\"")
+    _assert_parse_fails(ts, "[server]\nhost = \"a\"\n[server]\nport = 8080")
+end
+
+
+func run_tests(ts):
+    test_empty_document(ts)
+    test_blank_lines(ts)
+    test_root_values(ts)
+    test_whitespace(ts)
+    test_comments(ts)
+    test_assignment_separator_in_string(ts)
+    test_string_escape_sequences(ts)
+    test_table_values(ts)
+    test_multiple_tables(ts)
+    test_same_key_different_scopes(ts)
+    test_failures(ts)
+end
+
+func main():
+    ts := test::suite_new(_)
+    run_tests(ts)
+    test::suite_finish(ts)
+end
