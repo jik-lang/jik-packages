@@ -2,6 +2,10 @@
 
 Official packages for the Jik programming language.
 
+## Compatibility
+
+This package set requires Jik >= 0.1.0-alpha.9.
+
 ## Usage
 
 Clone this repository and set `JIK_PKG_PATH` to the repository root.
