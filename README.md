@@ -1,6 +1,6 @@
 # Jik packages
 
-<a href="https://github.com/jik-lang/jik-packages/actions/workflows/test.yml"><img alt="Test" src="https://github.com/jik-lang/jik-packages/actions/workflows/test.yml/badge.svg?branch=main&event=push"></a>
+<a href="https://github.com/jik-lang/jik-packages/actions/workflows/test.yml"><img alt="Test" src="https://github.com/jik-lang/jik-packages/actions/workflows/test.yml/badge.svg?branch=main"></a>
 
 Official packages for the Jik programming language.
 
