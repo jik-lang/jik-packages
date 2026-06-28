@@ -1,3 +1,4 @@
+use "jik/io"
 use "jik/testing" as test
 use "../src/toml"
 
@@ -32,6 +33,19 @@ func test_empty_document(ts):
     doc := must toml::parse("", _)
     test::suite_assert(ts, len(doc.root) == 0, site())
     test::suite_assert(ts, len(doc.tables) == 0, site())
+end
+
+func test_fixture_file(ts):
+    src := must io::read_file("packages/toml/test/fixtures/app.toml", _)
+    doc := must toml::parse(src, _)
+    _assert_int(ts, doc.root["port"], 8080)
+    _assert_string(ts, doc.root["host"], "localhost")
+    _assert_bool(ts, doc.root["ready"], true)
+    _assert_string(ts, doc.root["path"], "C:\\tmp")
+    _assert_string(ts, doc.tables["server"]?["host"], "local#host")
+    _assert_bool(ts, doc.tables["server"]?["secure"], false)
+    _assert_string(ts, doc.tables["client"]?["host"], "remote")
+    _assert_int(ts, doc.tables["client"]?["port"], 9000)
 end
 
 func test_blank_lines(ts):
@@ -115,6 +129,7 @@ end
 
 func run_tests(ts):
     test_empty_document(ts)
+    test_fixture_file(ts)
     test_blank_lines(ts)
     test_root_values(ts)
     test_whitespace(ts)

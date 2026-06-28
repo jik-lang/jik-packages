@@ -1,0 +1,13 @@
+# app config
+port = 8080
+host = "localhost"
+ready = true
+path = "C:\\tmp"
+
+[server]
+host = "local#host"
+secure = false
+
+[client]
+host = "remote"
+port = 9000

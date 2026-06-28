@@ -1,0 +1,131 @@
+//! Small CSV parser.
+//!
+//! Supported subset:
+//! - single-character delimiters
+//! - newline-separated records using `\n`
+//! - Windows line endings using `\r\n`
+//! - unquoted fields
+//! - quoted fields
+//! - delimiters inside quoted fields
+//! - escaped quotes inside quoted fields using doubled quotes
+//! - empty fields
+
+use "jik/strbuf"
+
+
+// -------------------------------------------------------------
+//      Helpers
+// -------------------------------------------------------------
+
+
+throws func _validate_delimiter(delimiter: char):
+    if delimiter == '"':
+        fail("csv: delimiter cannot be a quote")
+    elif delimiter == '\n':
+        fail("csv: delimiter cannot be a newline")
+    elif delimiter == '\r':
+        fail("csv: delimiter cannot be a carriage return")
+    end
+end
+
+func _finish_field(row: Vec[String], field: strbuf::StrBuf, r: Region):
+    push(row, strbuf::to_string(field, r))
+    strbuf::clear(field)
+end
+
+
+// -------------------------------------------------------------
+//      API
+// -------------------------------------------------------------
+
+
+/// Parse CSV source into rows of string fields.
+///
+/// Unsupported CSV forms return a parse error. Pass `','` as the delimiter for
+/// normal comma-separated values.
+///
+/// @param src CSV source text.
+/// @param delimiter Field delimiter.
+/// @param r Allocation region for the returned rows.
+/// @returns Parsed CSV rows.
+throws func parse(foreign src: String, delimiter: char, r: Region) -> Vec[Vec[String]]:
+    try _validate_delimiter(delimiter):
+    except:
+        fail(error_msg(r), error_code())
+    end
+
+    rows: Vec[Vec[String]][r]
+    row: Vec[String][r]
+    field := strbuf::new("", r)
+
+    in_quotes := false
+    quoted_closed := false
+    n := len(src)
+    i := 0
+
+    while i < n:
+        ch := src[i]
+
+        if in_quotes:
+            if ch == '"':
+                if i + 1 < n and src[i + 1] == '"':
+                    strbuf::append_char(field, '"')
+                    i += 1
+                else:
+                    in_quotes = false
+                    quoted_closed = true
+                end
+            elif ch == '\n' or ch == '\r':
+                fail("csv: multiline quoted fields are not supported")
+            else:
+                strbuf::append_char(field, ch)
+            end
+        else:
+            if ch == delimiter:
+                _finish_field(row, field, r)
+                quoted_closed = false
+            elif ch == '\n':
+                _finish_field(row, field, r)
+                push(rows, row)
+                row = [0 of ""][r]
+                quoted_closed = false
+            elif ch == '\r':
+                if i + 1 < n and src[i + 1] == '\n':
+                    _finish_field(row, field, r)
+                    push(rows, row)
+                    row = [0 of ""][r]
+                    quoted_closed = false
+                    i += 1
+                else:
+                    fail("csv: bare carriage return")
+                end
+            elif ch == '"':
+                if quoted_closed:
+                    fail("csv: text after closing quote")
+                elif strbuf::len(field) == 0:
+                    in_quotes = true
+                else:
+                    fail("csv: quote inside unquoted field")
+                end
+            else:
+                if quoted_closed:
+                    fail("csv: text after closing quote")
+                end
+                strbuf::append_char(field, ch)
+            end
+        end
+
+        i += 1
+    end
+
+    if in_quotes:
+        fail("csv: unmatched quote")
+    end
+
+    if n > 0 and src[n - 1] != '\n':
+        _finish_field(row, field, r)
+        push(rows, row)
+    end
+
+    return rows
+end

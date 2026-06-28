@@ -1,9 +1,11 @@
 use "jik/testing" as test
-use "../packages/toml/test/test_toml" as toml_tests
+use "../packages/csv/test/test_csv"
+use "../packages/toml/test/test_toml"
 
 
 func main():
     ts := test::suite_new(_)
-    toml_tests::run_tests(ts)
+    test_csv::run_tests(ts)
+    test_toml::run_tests(ts)
     test::suite_finish(ts)
 end

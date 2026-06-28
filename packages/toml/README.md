@@ -1,6 +1,6 @@
 # TOML parser
 
-Small TOML parser for Jik.
+TOML parser for Jik.
 
 See the [API reference](docs/api.md) for public data types and access patterns.
 

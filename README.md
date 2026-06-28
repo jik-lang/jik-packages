@@ -43,7 +43,8 @@ Run `jik env` to check the resolved package path. It is printed as
 
 ## Packages
 
-- [`toml`](packages/toml) - small TOML parser
+- [`csv`](packages/csv) - CSV parser
+- [`toml`](packages/toml) - TOML parser
 
 ## Testing
 

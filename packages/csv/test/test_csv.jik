@@ -1,0 +1,170 @@
+use "jik/io"
+use "jik/testing" as test
+use "../src/csv"
+
+
+func _assert_cell(ts, foreign rows: Vec[Vec[String]], row: int, col: int, foreign expected: String):
+    test::suite_assert(ts, rows[row][col] == expected, site())
+end
+
+func _assert_row_count(ts, foreign rows: Vec[Vec[String]], expected: int):
+    test::suite_assert(ts, len(rows) == expected, site())
+end
+
+func _assert_row_len(ts, foreign rows: Vec[Vec[String]], row: int, expected: int):
+    test::suite_assert(ts, len(rows[row]) == expected, site())
+end
+
+func _assert_parse_fails(ts, foreign src: String, delimiter: char):
+    try doc := csv::parse(src, delimiter, _):
+        test::suite_assert(ts, false, site())
+    except:
+        test::suite_assert(ts, true, site())
+    end
+end
+
+func test_empty_input(ts):
+    rows := must csv::parse("", ',', _)
+    _assert_row_count(ts, rows, 0)
+end
+
+func test_fixture_file(ts):
+    src := must io::read_file("packages/csv/test/fixtures/people.csv", _)
+    rows := must csv::parse(src, ',', _)
+    _assert_row_count(ts, rows, 5)
+    _assert_row_len(ts, rows, 0, 3)
+    _assert_cell(ts, rows, 0, 0, "name")
+    _assert_cell(ts, rows, 1, 0, "Ada")
+    _assert_cell(ts, rows, 1, 2, "London")
+    _assert_cell(ts, rows, 2, 0, "Grace, Hopper")
+    _assert_cell(ts, rows, 2, 1, "85")
+    _assert_cell(ts, rows, 3, 0, "she said \"hi\"")
+    _assert_cell(ts, rows, 3, 1, "")
+    _assert_cell(ts, rows, 3, 2, "")
+    _assert_cell(ts, rows, 4, 0, "1")
+    _assert_cell(ts, rows, 4, 1, "2.23")
+    _assert_cell(ts, rows, 4, 2, "foo")
+end
+
+func test_one_unquoted_row(ts):
+    rows := must csv::parse("name,age,city", ',', _)
+    _assert_row_count(ts, rows, 1)
+    _assert_row_len(ts, rows, 0, 3)
+    _assert_cell(ts, rows, 0, 0, "name")
+    _assert_cell(ts, rows, 0, 1, "age")
+    _assert_cell(ts, rows, 0, 2, "city")
+end
+
+func test_multiple_rows(ts):
+    rows := must csv::parse("name,age\nAda,36\nGrace,85", ',', _)
+    _assert_row_count(ts, rows, 3)
+    _assert_cell(ts, rows, 0, 0, "name")
+    _assert_cell(ts, rows, 1, 0, "Ada")
+    _assert_cell(ts, rows, 1, 1, "36")
+    _assert_cell(ts, rows, 2, 0, "Grace")
+    _assert_cell(ts, rows, 2, 1, "85")
+end
+
+func test_empty_fields(ts):
+    rows := must csv::parse("a,,c\n,b\na,", ',', _)
+    _assert_row_count(ts, rows, 3)
+    _assert_cell(ts, rows, 0, 0, "a")
+    _assert_cell(ts, rows, 0, 1, "")
+    _assert_cell(ts, rows, 0, 2, "c")
+    _assert_cell(ts, rows, 1, 0, "")
+    _assert_cell(ts, rows, 1, 1, "b")
+    _assert_cell(ts, rows, 2, 0, "a")
+    _assert_cell(ts, rows, 2, 1, "")
+end
+
+func test_trailing_newline(ts):
+    rows := must csv::parse("a,b\n", ',', _)
+    _assert_row_count(ts, rows, 1)
+    _assert_row_len(ts, rows, 0, 2)
+end
+
+func test_crlf(ts):
+    rows := must csv::parse("a,b\r\nc,d\r\n", ',', _)
+    _assert_row_count(ts, rows, 2)
+    _assert_cell(ts, rows, 0, 0, "a")
+    _assert_cell(ts, rows, 0, 1, "b")
+    _assert_cell(ts, rows, 1, 0, "c")
+    _assert_cell(ts, rows, 1, 1, "d")
+end
+
+func test_quoted_comma(ts):
+    rows := must csv::parse("\"last, first\",score", ',', _)
+    _assert_row_count(ts, rows, 1)
+    _assert_cell(ts, rows, 0, 0, "last, first")
+    _assert_cell(ts, rows, 0, 1, "score")
+end
+
+func test_escaped_quotes(ts):
+    rows := must csv::parse("\"she said \"\"hi\"\"\",ok", ',', _)
+    _assert_cell(ts, rows, 0, 0, "she said \"hi\"")
+    _assert_cell(ts, rows, 0, 1, "ok")
+end
+
+func test_quoted_empty_field(ts):
+    rows := must csv::parse("\"\",value", ',', _)
+    _assert_cell(ts, rows, 0, 0, "")
+    _assert_cell(ts, rows, 0, 1, "value")
+end
+
+func test_custom_delimiter(ts):
+    rows := must csv::parse("name;age;city\nAda;36;London", ';', _)
+    _assert_row_count(ts, rows, 2)
+    _assert_cell(ts, rows, 0, 0, "name")
+    _assert_cell(ts, rows, 0, 1, "age")
+    _assert_cell(ts, rows, 0, 2, "city")
+    _assert_cell(ts, rows, 1, 0, "Ada")
+    _assert_cell(ts, rows, 1, 1, "36")
+    _assert_cell(ts, rows, 1, 2, "London")
+end
+
+func test_custom_delimiter_inside_quotes(ts):
+    rows := must csv::parse("\"a;b\";c", ';', _)
+    _assert_cell(ts, rows, 0, 0, "a;b")
+    _assert_cell(ts, rows, 0, 1, "c")
+end
+
+func test_spaces_are_preserved(ts):
+    rows := must csv::parse(" a , b ", ',', _)
+    _assert_cell(ts, rows, 0, 0, " a ")
+    _assert_cell(ts, rows, 0, 1, " b ")
+end
+
+func test_failures(ts):
+    _assert_parse_fails(ts, "a,b", '"')
+    _assert_parse_fails(ts, "a,b", '\n')
+    _assert_parse_fails(ts, "a,b", '\r')
+    _assert_parse_fails(ts, "\"unterminated", ',')
+    _assert_parse_fails(ts, "a\"b,c", ',')
+    _assert_parse_fails(ts, "\"a\"b,c", ',')
+    _assert_parse_fails(ts, "a\rb", ',')
+    _assert_parse_fails(ts, "\"a\nb\"", ',')
+end
+
+
+func run_tests(ts):
+    test_empty_input(ts)
+    test_fixture_file(ts)
+    test_one_unquoted_row(ts)
+    test_multiple_rows(ts)
+    test_empty_fields(ts)
+    test_trailing_newline(ts)
+    test_crlf(ts)
+    test_quoted_comma(ts)
+    test_escaped_quotes(ts)
+    test_quoted_empty_field(ts)
+    test_custom_delimiter(ts)
+    test_custom_delimiter_inside_quotes(ts)
+    test_spaces_are_preserved(ts)
+    test_failures(ts)
+end
+
+func main():
+    ts := test::suite_new(_)
+    run_tests(ts)
+    test::suite_finish(ts)
+end
