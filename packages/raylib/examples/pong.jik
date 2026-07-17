@@ -1,0 +1,184 @@
+//! A small two-player Pong game.
+
+use "pkg/raylib" as rl
+use "jik/math"
+use "jik/string"
+
+
+SCREEN_WIDTH := 900
+SCREEN_HEIGHT := 540
+PADDLE_WIDTH := 16.0
+PADDLE_HEIGHT := 100.0
+PADDLE_SPEED := 360.0
+BALL_SIZE := 14.0
+BALL_SPEED := 320.0
+
+
+struct Ball:
+    x: double
+    y: double
+    velocity_x: double
+    velocity_y: double
+end
+
+
+struct Game:
+    player_y: double
+    opponent_y: double
+    ball: Ball
+    player_score: int
+    opponent_score: int
+end
+
+
+func reset_ball(g: Game, direction: double):
+    g.ball.x = SCREEN_WIDTH / 2.0
+    g.ball.y = SCREEN_HEIGHT / 2.0
+    g.ball.velocity_x = BALL_SPEED * direction
+    g.ball.velocity_y = BALL_SPEED * 0.55
+end
+
+
+func new_game(region: Region) -> Game:
+    g := Game{
+        player_y = SCREEN_HEIGHT / 2.0 - PADDLE_HEIGHT / 2.0,
+        ball = Ball{x = 0.0, y = 0.0, velocity_x = 0.0, velocity_y = 0.0},
+        player_score = 0,
+        opponent_score = 0
+    }[region]
+    reset_ball(g, 1.0)
+    return g
+end
+
+
+func keep_paddle_on_screen(y: double) -> double:
+    if y < 0.0:
+        return 0.0
+    elif y > SCREEN_HEIGHT - PADDLE_HEIGHT:
+        return SCREEN_HEIGHT - PADDLE_HEIGHT
+    end
+    return y
+end
+
+
+func ball_hits_paddle(g: Game, paddle_x: double, paddle_y: double) -> bool:
+    ball_left := g.ball.x - BALL_SIZE / 2.0
+    ball_right := g.ball.x + BALL_SIZE / 2.0
+    ball_top := g.ball.y - BALL_SIZE / 2.0
+    ball_bottom := g.ball.y + BALL_SIZE / 2.0
+    paddle_right := paddle_x + PADDLE_WIDTH
+    paddle_bottom := paddle_y + PADDLE_HEIGHT
+
+    return ball_right >= paddle_x and ball_left <= paddle_right and ball_bottom >= paddle_y and ball_top <= paddle_bottom
+end
+
+
+func update(g: Game, dt: double):
+    if rl::is_key_down(rl::KEY_W):
+        g.opponent_y -= PADDLE_SPEED * dt
+    end
+    if rl::is_key_down(rl::KEY_S):
+        g.opponent_y += PADDLE_SPEED * dt
+    end
+    g.opponent_y = keep_paddle_on_screen(g.opponent_y)
+
+    if rl::is_key_down(rl::KEY_UP):
+        g.player_y -= PADDLE_SPEED * dt
+    end
+    if rl::is_key_down(rl::KEY_DOWN):
+        g.player_y += PADDLE_SPEED * dt
+    end
+    g.player_y = keep_paddle_on_screen(g.player_y)
+
+    g.ball.x += g.ball.velocity_x * dt
+    g.ball.y += g.ball.velocity_y * dt
+
+    if g.ball.y - BALL_SIZE / 2.0 <= 0.0:
+        g.ball.y = BALL_SIZE / 2.0
+        g.ball.velocity_y = math::abs(g.ball.velocity_y)
+    elif g.ball.y + BALL_SIZE / 2.0 >= SCREEN_HEIGHT:
+        g.ball.y = SCREEN_HEIGHT - BALL_SIZE / 2.0
+        g.ball.velocity_y = -math::abs(g.ball.velocity_y)
+    end
+
+    opponent_x := 34.0
+    player_x := SCREEN_WIDTH - 50.0
+    if g.ball.velocity_x < 0.0 and ball_hits_paddle(g, opponent_x, g.opponent_y):
+        g.ball.x = opponent_x + PADDLE_WIDTH + BALL_SIZE / 2.0
+        g.ball.velocity_x = math::abs(g.ball.velocity_x)
+    elif g.ball.velocity_x > 0.0 and ball_hits_paddle(g, player_x, g.player_y):
+        g.ball.x = player_x - BALL_SIZE / 2.0
+        g.ball.velocity_x = -math::abs(g.ball.velocity_x)
+    end
+
+    if g.ball.x < -BALL_SIZE:
+        g.player_score += 1
+        reset_ball(g, 1.0)
+    elif g.ball.x > SCREEN_WIDTH + BALL_SIZE:
+        g.opponent_score += 1
+        reset_ball(g, -1.0)
+    end
+end
+
+
+func draw_centered(foreign text: String, y: int, size: int,
+                   foreign color: rl::Color):
+    width := rl::measure_text(text, size)
+    rl::draw_text(text, (SCREEN_WIDTH - width) / 2, y, size, color)
+end
+
+
+func draw_game(foreign g: Game):
+    rl::clear_background(rl::BLACK)
+
+    i := 0
+    while i < SCREEN_HEIGHT:
+        rl::draw_rectangle(
+            rl::Rectangle{x = SCREEN_WIDTH / 2.0 - 2.0, y = i * 1.0,
+                              width = 4.0, height = 18.0},
+            rl::DARKGRAY)
+        i += 34
+    end
+
+    rl::draw_text("PONG", 24, 18, 24, rl::LIGHTGRAY)
+    player_score := string::from_int(g.player_score, _)
+    opponent_score := string::from_int(g.opponent_score, _)
+    rl::draw_text(player_score, SCREEN_WIDTH / 2 + 46, 18, 32, rl::WHITE)
+    rl::draw_text(opponent_score, SCREEN_WIDTH / 2 - 70, 18, 32, rl::WHITE)
+    rl::draw_text("W / S", 34, SCREEN_HEIGHT - 30, 18, rl::RED)
+    rl::draw_text("ARROWS", SCREEN_WIDTH - 100, SCREEN_HEIGHT - 30, 18, rl::BLUE)
+
+    rl::draw_rectangle(
+        rl::Rectangle{x = 34.0, y = g.opponent_y,
+                          width = PADDLE_WIDTH, height = PADDLE_HEIGHT},
+        rl::RED)
+    rl::draw_rectangle(
+        rl::Rectangle{x = SCREEN_WIDTH - 50.0, y = g.player_y,
+                          width = PADDLE_WIDTH, height = PADDLE_HEIGHT},
+        rl::BLUE)
+    rl::draw_rectangle(
+        rl::Rectangle{x = g.ball.x - BALL_SIZE / 2.0,
+                          y = g.ball.y - BALL_SIZE / 2.0,
+                          width = BALL_SIZE, height = BALL_SIZE},
+        rl::YELLOW)
+end
+
+
+func main():
+    rl::init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Jik Pong")
+    rl::set_target_fps(120)
+
+    g := new_game(_)
+    while not rl::window_should_close():
+        if rl::is_key_pressed(rl::KEY_ENTER):
+            g = new_game(_)
+        end
+
+        update(g, rl::get_frame_time())
+        rl::begin_drawing()
+        draw_game(g)
+        rl::end_drawing()
+    end
+
+    rl::close_window()
+end

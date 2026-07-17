@@ -1,0 +1,645 @@
+//! Game state and rules for the Missile Defence showcase.
+
+use "jik/math"
+use "jik/rand"
+use "pkg/raylib" as rl
+
+
+SCREEN_WIDTH := 960.0
+SCREEN_HEIGHT := 540.0
+GROUND_Y := 470.0
+
+PLAYER_MISSILE_SPEED := 520.0
+ENEMY_BASE_SPEED := 58.0
+EXPLOSION_SPEED := 90.0
+PLAYER_EXPLOSION_RADIUS := 52.0
+CHAIN_EXPLOSION_RADIUS := 34.0
+IMPACT_EXPLOSION_RADIUS := 24.0
+
+BATTERY_AMMO := 10
+TARGET_BATTERY_OFFSET := 100
+MAX_ENEMIES := 48
+MAX_PLAYER_MISSILES := 30
+MAX_EXPLOSIONS := 64
+
+
+enum GameState:
+    TITLE
+    PLAYING
+    GAME_OVER
+end
+
+
+enum Difficulty:
+    EASY
+    NORMAL
+    HARD
+    EXPERT
+end
+
+
+struct City:
+    position: rl::Vector2
+    alive: bool
+end
+
+
+struct Battery:
+    position: rl::Vector2
+    ammo: int
+    alive: bool
+end
+
+
+struct EnemyMissile:
+    active: bool
+    start: rl::Vector2
+    target: rl::Vector2
+    position: rl::Vector2
+    duration: double
+    progress: double
+    target_code: int
+end
+
+
+struct PlayerMissile:
+    active: bool
+    start: rl::Vector2
+    target: rl::Vector2
+    position: rl::Vector2
+    duration: double
+    progress: double
+end
+
+
+struct Explosion:
+    active: bool
+    center: rl::Vector2
+    radius: double
+    max_radius: double
+    growing: bool
+    friendly: bool
+end
+
+
+struct Game:
+    state: GameState
+    difficulty: Difficulty
+    score: int
+    wave: int
+    enemies_to_spawn: int
+    spawn_timer: double
+    wave_clear_timer: double
+    explosions_started: int
+    impacts_started: int
+    cities: Vec[City]
+    batteries: Vec[Battery]
+    enemies: Vec[EnemyMissile]
+    player_missiles: Vec[PlayerMissile]
+    explosions: Vec[Explosion]
+end
+
+
+func point(x: double, y: double, r: Region) -> rl::Vector2:
+    return rl::Vector2{x = x, y = y}[r]
+end
+
+
+func distance_squared(foreign a: rl::Vector2, foreign b: rl::Vector2) -> double:
+    dx := b.x - a.x
+    dy := b.y - a.y
+    return dx * dx + dy * dy
+end
+
+
+func _set_lerp(out: rl::Vector2,
+               foreign a: rl::Vector2,
+               foreign b: rl::Vector2,
+               t: double):
+    out.x = a.x + (b.x - a.x) * t
+    out.y = a.y + (b.y - a.y) * t
+end
+
+
+func _set_point(out: rl::Vector2, x: double, y: double):
+    out.x = x
+    out.y = y
+end
+
+
+func _setup_sites(g: Game):
+    city_xs := [190.0, 290.0, 390.0, 570.0, 670.0, 770.0]
+    for x in city_xs:
+        push(g.cities, City{
+            position = rl::Vector2{x = x, y = GROUND_Y},
+            alive = true
+        })
+    end
+
+    battery_xs := [80.0, 480.0, 880.0]
+    for x in battery_xs:
+        push(g.batteries, Battery{
+            position = rl::Vector2{x = x, y = GROUND_Y},
+            ammo = BATTERY_AMMO,
+            alive = true
+        })
+    end
+end
+
+
+func _setup_pools(g: Game):
+    i := 0
+    while i < MAX_ENEMIES:
+        push(g.enemies, EnemyMissile{
+            active = false,
+            start = rl::Vector2{},
+            target = rl::Vector2{},
+            position = rl::Vector2{}
+        })
+        i += 1
+    end
+
+    i = 0
+    while i < MAX_PLAYER_MISSILES:
+        push(g.player_missiles, PlayerMissile{
+            active = false,
+            start = rl::Vector2{},
+            target = rl::Vector2{},
+            position = rl::Vector2{}
+        })
+        i += 1
+    end
+
+    i = 0
+    while i < MAX_EXPLOSIONS:
+        push(g.explosions, Explosion{
+            active = false,
+            center = rl::Vector2{}
+        })
+        i += 1
+    end
+end
+
+
+func new(r: Region) -> Game:
+    g := Game{state = GameState.TITLE, difficulty = Difficulty.NORMAL}[r]
+    _setup_sites(g)
+    _setup_pools(g)
+    return g
+end
+
+
+func difficulty_name(g: Game, r: Region) -> String:
+    if g.difficulty == Difficulty.EASY:
+        return "EASY"[r]
+    end
+    if g.difficulty == Difficulty.HARD:
+        return "HARD"[r]
+    end
+    if g.difficulty == Difficulty.EXPERT:
+        return "EXPERT"[r]
+    end
+    return "NORMAL"[r]
+end
+
+
+func change_difficulty(g: Game, direction: int):
+    if direction < 0:
+        if g.difficulty == Difficulty.EASY:
+            g.difficulty = Difficulty.EXPERT
+        elif g.difficulty == Difficulty.NORMAL:
+            g.difficulty = Difficulty.EASY
+        elif g.difficulty == Difficulty.HARD:
+            g.difficulty = Difficulty.NORMAL
+        else:
+            g.difficulty = Difficulty.HARD
+        end
+        return
+    end
+
+    if g.difficulty == Difficulty.EASY:
+        g.difficulty = Difficulty.NORMAL
+    elif g.difficulty == Difficulty.NORMAL:
+        g.difficulty = Difficulty.HARD
+    elif g.difficulty == Difficulty.HARD:
+        g.difficulty = Difficulty.EXPERT
+    else:
+        g.difficulty = Difficulty.EASY
+    end
+end
+
+
+func _enemy_speed(g: Game) -> double:
+    multiplier := 1.0
+    growth := 0.08
+    if g.difficulty == Difficulty.EASY:
+        multiplier = 0.85
+        growth = 0.05
+    elif g.difficulty == Difficulty.HARD:
+        multiplier = 1.15
+        growth = 0.11
+    elif g.difficulty == Difficulty.EXPERT:
+        multiplier = 1.30
+        growth = 0.14
+    end
+    return ENEMY_BASE_SPEED * multiplier * (1.0 + growth * (g.wave - 1))
+end
+
+
+func _player_missile_speed(g: Game) -> double:
+    multiplier := 1.0
+    growth := 0.04
+    if g.difficulty == Difficulty.EASY:
+        multiplier = 1.10
+        growth = 0.03
+    elif g.difficulty == Difficulty.HARD:
+        multiplier = 0.95
+    elif g.difficulty == Difficulty.EXPERT:
+        multiplier = 0.90
+        growth = 0.03
+    end
+    return PLAYER_MISSILE_SPEED * multiplier * (1.0 + growth * (g.wave - 1))
+end
+
+
+func living_cities(g: Game) -> int:
+    count := 0
+    for city in g.cities:
+        if city.alive:
+            count += 1
+        end
+    end
+    return count
+end
+
+
+func active_enemies(g: Game) -> int:
+    count := 0
+    for enemy in g.enemies:
+        if enemy.active:
+            count += 1
+        end
+    end
+    return count
+end
+
+
+func active_player_missiles(g: Game) -> int:
+    count := 0
+    for missile in g.player_missiles:
+        if missile.active:
+            count += 1
+        end
+    end
+    return count
+end
+
+
+func active_explosions(g: Game) -> int:
+    count := 0
+    for explosion in g.explosions:
+        if explosion.active:
+            count += 1
+        end
+    end
+    return count
+end
+
+
+func _reset_sites(g: Game):
+    for city in g.cities:
+        city.alive = true
+    end
+    for battery in g.batteries:
+        battery.alive = true
+        battery.ammo = BATTERY_AMMO
+    end
+end
+
+
+func _clear_pools(g: Game):
+    for enemy in g.enemies:
+        enemy.active = false
+    end
+    for missile in g.player_missiles:
+        missile.active = false
+    end
+    for explosion in g.explosions:
+        explosion.active = false
+    end
+end
+
+
+func _begin_wave(g: Game):
+    g.enemies_to_spawn = 5 + g.wave * 2
+    g.spawn_timer = 1.0
+    g.wave_clear_timer = 0.0
+    for battery in g.batteries:
+        if battery.alive:
+            battery.ammo = BATTERY_AMMO
+        end
+    end
+end
+
+
+func start(g: Game):
+    _clear_pools(g)
+    _reset_sites(g)
+    g.state = GameState.PLAYING
+    g.score = 0
+    g.wave = 1
+    _begin_wave(g)
+end
+
+
+func _add_explosion(g: Game,
+                    foreign center: rl::Vector2,
+                    max_radius: double,
+                    friendly: bool):
+    for explosion in g.explosions:
+        if not explosion.active:
+            explosion.active = true
+            _set_point(explosion.center, center.x, center.y)
+            explosion.radius = 2.0
+            explosion.max_radius = max_radius
+            explosion.growing = true
+            explosion.friendly = friendly
+            g.explosions_started += 1
+            return
+        end
+    end
+end
+
+
+func fire(g: Game, x: double, y: double) -> bool:
+    if g.state != GameState.PLAYING or y < 24.0 or y >= GROUND_Y - 8.0:
+        return false
+    end
+
+    selected := -1
+    best_distance := SCREEN_WIDTH * 2.0
+    i := 0
+    while i < len(g.batteries):
+        battery := g.batteries[i]
+        if battery.alive and battery.ammo > 0:
+            dx := math::abs(battery.position.x - x)
+            if dx < best_distance:
+                best_distance = dx
+                selected = i
+            end
+        end
+        i += 1
+    end
+
+    if selected < 0:
+        return false
+    end
+
+    slot := -1
+    i = 0
+    while i < len(g.player_missiles):
+        if not g.player_missiles[i].active:
+            slot = i
+            break
+        end
+        i += 1
+    end
+    if slot < 0:
+        return false
+    end
+
+    battery := g.batteries[selected]
+    missile := g.player_missiles[slot]
+    start_y := battery.position.y - 12.0
+    dx := x - battery.position.x
+    dy := y - start_y
+    missile.active = true
+    _set_point(missile.start, battery.position.x, start_y)
+    _set_point(missile.target, x, y)
+    _set_point(missile.position, battery.position.x, start_y)
+    missile.duration = math::sqrt(dx * dx + dy * dy) / _player_missile_speed(g)
+    missile.progress = 0.0
+    battery.ammo -= 1
+    return true
+end
+
+
+func _choose_target(g: Game, rng: rand::Rng) -> int:
+    targets := [0 of 0]
+    i := 0
+    while i < len(g.cities):
+        if g.cities[i].alive:
+            push(targets, i)
+        end
+        i += 1
+    end
+
+    i = 0
+    while i < len(g.batteries):
+        if g.batteries[i].alive:
+            push(targets, TARGET_BATTERY_OFFSET + i)
+        end
+        i += 1
+    end
+
+    if len(targets) == 0:
+        return -1
+    end
+    choice := must rand::range_int(rng, 0, len(targets))
+    return targets[choice]
+end
+
+
+func _spawn_enemy(g: Game, rng: rand::Rng):
+    target_code := _choose_target(g, rng)
+    if target_code < 0:
+        g.state = GameState.GAME_OVER
+        return
+    end
+
+    slot := -1
+    i := 0
+    while i < len(g.enemies):
+        if not g.enemies[i].active:
+            slot = i
+            break
+        end
+        i += 1
+    end
+    if slot < 0:
+        return
+    end
+
+    target_x := 0.0
+    target_y := GROUND_Y
+    if target_code >= TARGET_BATTERY_OFFSET:
+        target_x = g.batteries[target_code - TARGET_BATTERY_OFFSET].position.x
+    else:
+        target_x = g.cities[target_code].position.x
+    end
+
+    start_x := 35.0 + rand::next_double(rng) * (SCREEN_WIDTH - 70.0)
+    speed := _enemy_speed(g)
+    dx := target_x - start_x
+    dy := target_y - 8.0
+    missile := g.enemies[slot]
+    missile.active = true
+    _set_point(missile.start, start_x, 8.0)
+    _set_point(missile.target, target_x, target_y)
+    _set_point(missile.position, start_x, 8.0)
+    missile.duration = math::sqrt(dx * dx + dy * dy) / speed
+    missile.progress = 0.0
+    missile.target_code = target_code
+end
+
+
+func _update_player_missiles(g: Game, dt: double):
+    i := 0
+    while i < len(g.player_missiles):
+        missile := g.player_missiles[i]
+        if missile.active:
+            missile.progress += dt / missile.duration
+            if missile.progress >= 1.0:
+                missile.active = false
+                _add_explosion(g, missile.target, PLAYER_EXPLOSION_RADIUS, true)
+            else:
+                _set_lerp(missile.position, missile.start, missile.target, missile.progress)
+            end
+        end
+        i += 1
+    end
+end
+
+
+func _destroy_target(g: Game, target_code: int):
+    g.impacts_started += 1
+    if target_code >= TARGET_BATTERY_OFFSET:
+        index := target_code - TARGET_BATTERY_OFFSET
+        g.batteries[index].alive = false
+        g.batteries[index].ammo = 0
+    else:
+        g.cities[target_code].alive = false
+    end
+end
+
+
+func _update_enemy_missiles(g: Game, dt: double):
+    i := 0
+    while i < len(g.enemies):
+        missile := g.enemies[i]
+        if missile.active:
+            missile.progress += dt / missile.duration
+            if missile.progress >= 1.0:
+                missile.active = false
+                _destroy_target(g, missile.target_code)
+                _add_explosion(g, missile.target, IMPACT_EXPLOSION_RADIUS, false)
+            else:
+                _set_lerp(missile.position, missile.start, missile.target, missile.progress)
+            end
+        end
+        i += 1
+    end
+end
+
+
+func _enemy_is_intercepted(g: Game, foreign position: rl::Vector2) -> bool:
+    for explosion in g.explosions:
+        if explosion.active and explosion.friendly:
+            radius2 := explosion.radius * explosion.radius
+            if distance_squared(explosion.center, position) <= radius2:
+                return true
+            end
+        end
+    end
+    return false
+end
+
+
+func _resolve_interceptions(g: Game):
+    i := 0
+    while i < len(g.enemies):
+        missile := g.enemies[i]
+        if missile.active and _enemy_is_intercepted(g, missile.position):
+            missile.active = false
+            _add_explosion(g, missile.position, CHAIN_EXPLOSION_RADIUS, true)
+            g.score += 100
+        end
+        i += 1
+    end
+end
+
+
+func _update_explosions(g: Game, dt: double):
+    i := 0
+    while i < len(g.explosions):
+        explosion := g.explosions[i]
+        if explosion.active:
+            if explosion.growing:
+                explosion.radius += EXPLOSION_SPEED * dt
+                if explosion.radius >= explosion.max_radius:
+                    explosion.radius = explosion.max_radius
+                    explosion.growing = false
+                end
+            else:
+                explosion.radius -= EXPLOSION_SPEED * dt
+                if explosion.radius <= 0.0:
+                    explosion.active = false
+                end
+            end
+        end
+        i += 1
+    end
+end
+
+
+func _spawn_interval(wave: int) -> double:
+    interval := 1.15 - (wave - 1) * 0.06
+    return math::max(interval, 0.38)
+end
+
+
+func _update_wave(g: Game, rng: rand::Rng, dt: double):
+    if g.enemies_to_spawn > 0:
+        g.spawn_timer -= dt
+        if g.spawn_timer <= 0.0:
+            _spawn_enemy(g, rng)
+            g.enemies_to_spawn -= 1
+            g.spawn_timer = _spawn_interval(g.wave)
+        end
+        return
+    end
+
+    if active_enemies(g) > 0:
+        return
+    end
+
+    if g.wave_clear_timer <= 0.0:
+        g.wave_clear_timer = 2.0
+    else:
+        g.wave_clear_timer -= dt
+        if g.wave_clear_timer <= 0.0:
+            g.wave += 1
+            _begin_wave(g)
+        end
+    end
+end
+
+
+func update(g: Game, rng: rand::Rng, dt: double):
+    g.explosions_started = 0
+    g.impacts_started = 0
+    if g.state != GameState.PLAYING:
+        return
+    end
+
+    safe_dt := math::min(dt, 0.05)
+    _update_wave(g, rng, safe_dt)
+    _update_player_missiles(g, safe_dt)
+    _update_enemy_missiles(g, safe_dt)
+    _resolve_interceptions(g)
+    _update_explosions(g, safe_dt)
+
+    if living_cities(g) == 0:
+        g.state = GameState.GAME_OVER
+    end
+end

@@ -1,0 +1,277 @@
+//! Playable vector-graphics Missile Defence showcase.
+
+use "jik/rand"
+use "jik/string"
+use "game"
+use "pkg/raylib" as rl
+
+
+SKY := rl::Color{r = 7, g = 12, b = 28, a = 255}
+GROUND := rl::Color{r = 42, g = 56, b = 44, a = 255}
+GROUND_LINE := rl::Color{r = 117, g = 150, b = 95, a = 255}
+CITY := rl::Color{r = 101, g = 190, b = 255, a = 255}
+BATTERY := rl::Color{r = 112, g = 224, b = 130, a = 255}
+CYAN := rl::Color{r = 90, g = 235, b = 255, a = 255}
+ORANGE := rl::Color{r = 255, g = 150, b = 52, a = 255}
+EXPLOSION := rl::Color{r = 255, g = 222, b = 92, a = 210}
+IMPACT := rl::Color{r = 245, g = 86, b = 62, a = 190}
+MUTED := rl::Color{r = 91, g = 101, b = 112, a = 255}
+
+
+struct GameAudio:
+    launch: rl::Sound
+    explosion: rl::Sound
+    impact: rl::Sound
+end
+
+
+func draw_centered(foreign text: String,
+                   y: int,
+                   size: int,
+                   foreign color: rl::Color):
+    width := rl::measure_text(text, size)
+    rl::draw_text(text, (960 - width) / 2, y, size, color)
+end
+
+
+func draw_background(r: Region):
+    rl::clear_background(SKY)
+
+    rl::draw_pixel(rl::Vector2{x = 88.0, y = 76.0}[r], rl::WHITE)
+    rl::draw_pixel(rl::Vector2{x = 173.0, y = 132.0}[r], rl::LIGHTGRAY)
+    rl::draw_pixel(rl::Vector2{x = 281.0, y = 58.0}[r], rl::WHITE)
+    rl::draw_pixel(rl::Vector2{x = 396.0, y = 104.0}[r], rl::LIGHTGRAY)
+    rl::draw_pixel(rl::Vector2{x = 542.0, y = 69.0}[r], rl::WHITE)
+    rl::draw_pixel(rl::Vector2{x = 651.0, y = 145.0}[r], rl::LIGHTGRAY)
+    rl::draw_pixel(rl::Vector2{x = 778.0, y = 91.0}[r], rl::WHITE)
+    rl::draw_pixel(rl::Vector2{x = 892.0, y = 54.0}[r], rl::LIGHTGRAY)
+
+    rl::draw_rectangle(
+        rl::Rectangle{x = 0.0, y = game::GROUND_Y, width = 960.0, height = 70.0}[r],
+        GROUND)
+    rl::draw_line(
+        rl::Vector2{x = 0.0, y = game::GROUND_Y}[r],
+        rl::Vector2{x = 960.0, y = game::GROUND_Y}[r],
+        GROUND_LINE)
+end
+
+
+func draw_city(foreign city: game::City, r: Region):
+    x := city.position.x
+    y := city.position.y
+    if city.alive:
+        rl::draw_rectangle(
+            rl::Rectangle{x = x - 23.0, y = y - 18.0, width = 14.0, height = 18.0}[r], CITY)
+        rl::draw_rectangle(
+            rl::Rectangle{x = x - 7.0, y = y - 27.0, width = 15.0, height = 27.0}[r], CITY)
+        rl::draw_rectangle(
+            rl::Rectangle{x = x + 10.0, y = y - 14.0, width = 13.0, height = 14.0}[r], CITY)
+    else:
+        rl::draw_rectangle(
+            rl::Rectangle{x = x - 22.0, y = y - 6.0, width = 13.0, height = 6.0}[r], MUTED)
+        rl::draw_rectangle(
+            rl::Rectangle{x = x - 5.0, y = y - 9.0, width = 12.0, height = 9.0}[r], MUTED)
+        rl::draw_rectangle(
+            rl::Rectangle{x = x + 11.0, y = y - 4.0, width = 11.0, height = 4.0}[r], MUTED)
+    end
+end
+
+
+func draw_battery(foreign battery: game::Battery, r: Region):
+    x := battery.position.x
+    y := battery.position.y
+    color := MUTED
+    if battery.alive:
+        color = BATTERY
+    end
+
+    rl::draw_rectangle(
+        rl::Rectangle{x = x - 24.0, y = y - 11.0, width = 48.0, height = 11.0}[r], color)
+    rl::draw_circle(rl::Vector2{x = x, y = y - 11.0}[r], 9.0, color)
+
+    if battery.alive:
+        rl::draw_line(
+            rl::Vector2{x = x, y = y - 13.0}[r],
+            rl::Vector2{x = x, y = y - 30.0}[r],
+            color)
+        ammo_x := x - 19.0
+        i := 0
+        while i < battery.ammo:
+            rl::draw_rectangle(
+                rl::Rectangle{x = ammo_x, y = y + 7.0, width = 3.0, height = 7.0}[r], color)
+            ammo_x += 4.0
+            i += 1
+        end
+    end
+end
+
+
+func draw_missiles(foreign g: game::Game):
+    for missile in g.enemies:
+        if missile.active:
+            rl::draw_line(missile.start, missile.position, ORANGE)
+            rl::draw_circle(missile.position, 2.5, rl::YELLOW)
+        end
+    end
+
+    for missile in g.player_missiles:
+        if missile.active:
+            rl::draw_line(missile.start, missile.position, CYAN)
+            rl::draw_circle(missile.position, 2.5, rl::WHITE)
+        end
+    end
+end
+
+
+func draw_explosions(foreign g: game::Game):
+    for explosion in g.explosions:
+        if explosion.active:
+            color := IMPACT
+            if explosion.friendly:
+                color = EXPLOSION
+            end
+            rl::draw_circle(explosion.center, explosion.radius, color)
+            rl::draw_circle_lines(explosion.center, explosion.radius, rl::WHITE)
+        end
+    end
+end
+
+
+func draw_hud(foreign g: game::Game, r: Region):
+    score_text := concat("SCORE "[r], string::from_int(g.score, r), r)
+    wave_text := concat("WAVE "[r], string::from_int(g.wave, r), r)
+    cities_text := concat("CITIES "[r], string::from_int(game::living_cities(g), r), r)
+    difficulty_text := "DIFFICULTY NORMAL"[r]
+    if g.difficulty == game::Difficulty.EASY:
+        difficulty_text = "DIFFICULTY EASY"[r]
+    elif g.difficulty == game::Difficulty.HARD:
+        difficulty_text = "DIFFICULTY HARD"[r]
+    elif g.difficulty == game::Difficulty.EXPERT:
+        difficulty_text = "DIFFICULTY EXPERT"[r]
+    end
+
+    rl::draw_text(score_text, 18, 15, 20, rl::WHITE)
+    rl::draw_text(wave_text, 390, 15, 20, rl::WHITE)
+    rl::draw_text(difficulty_text, 500, 15, 20, CYAN)
+    rl::draw_text(cities_text, 824, 15, 20, rl::WHITE)
+end
+
+
+func draw_cursor(foreign mouse: rl::Vector2, r: Region):
+    rl::draw_circle_lines(mouse, 10.0, CYAN)
+    rl::draw_line(
+        rl::Vector2{x = mouse.x - 15.0, y = mouse.y}[r],
+        rl::Vector2{x = mouse.x + 15.0, y = mouse.y}[r],
+        CYAN)
+    rl::draw_line(
+        rl::Vector2{x = mouse.x, y = mouse.y - 15.0}[r],
+        rl::Vector2{x = mouse.x, y = mouse.y + 15.0}[r],
+        CYAN)
+end
+
+
+func draw_scene(foreign g: game::Game, foreign mouse: rl::Vector2, r: Region):
+    draw_background(r)
+
+    for city in g.cities:
+        draw_city(city, r)
+    end
+    for battery in g.batteries:
+        draw_battery(battery, r)
+    end
+
+    draw_missiles(g)
+    draw_explosions(g)
+
+    if g.state == game::GameState.PLAYING:
+        draw_hud(g, r)
+        draw_cursor(mouse, r)
+    elif g.state == game::GameState.TITLE:
+        draw_centered("MISSILE DEFENCE"[r], 165, 48, rl::WHITE)
+        draw_centered("Defend the cities"[r], 230, 24, CITY)
+        difficulty_text := "DIFFICULTY: NORMAL  (LEFT/RIGHT)"[r]
+        if g.difficulty == game::Difficulty.EASY:
+            difficulty_text = "DIFFICULTY: EASY  (LEFT/RIGHT)"[r]
+        elif g.difficulty == game::Difficulty.HARD:
+            difficulty_text = "DIFFICULTY: HARD  (LEFT/RIGHT)"[r]
+        elif g.difficulty == game::Difficulty.EXPERT:
+            difficulty_text = "DIFFICULTY: EXPERT  (LEFT/RIGHT)"[r]
+        end
+        draw_centered(difficulty_text, 286, 20, CYAN)
+        draw_centered("Left click to fire"[r], 326, 20, rl::LIGHTGRAY)
+        draw_centered("Press Enter or Space to start"[r], 362, 20, CYAN)
+    else:
+        draw_centered("GAME OVER"[r], 180, 48, ORANGE)
+        score_text := concat("FINAL SCORE "[r], string::from_int(g.score, r), r)
+        draw_centered(score_text, 252, 24, rl::WHITE)
+        draw_centered("Press Enter or Space to restart"[r], 316, 20, CYAN)
+    end
+end
+
+
+func wants_start() -> bool:
+    return rl::is_key_pressed(rl::KEY_ENTER) or rl::is_key_pressed(rl::KEY_SPACE)
+end
+
+
+func run_frame(g: game::Game, rng: rand::Rng, audio: GameAudio):
+    mouse := rl::get_mouse_position(_)
+
+    if g.state == game::GameState.TITLE or g.state == game::GameState.GAME_OVER:
+        if g.state == game::GameState.TITLE:
+            if rl::is_key_pressed(rl::KEY_LEFT):
+                game::change_difficulty(g, -1)
+            elif rl::is_key_pressed(rl::KEY_RIGHT):
+                game::change_difficulty(g, 1)
+            end
+        end
+        if wants_start():
+            game::start(g)
+        end
+    else:
+        if rl::is_mouse_button_pressed(rl::MOUSE_BUTTON_LEFT):
+            if game::fire(g, mouse.x, mouse.y):
+                rl::play_sound(audio.launch)
+            end
+        end
+        game::update(g, rng, rl::get_frame_time())
+        if g.explosions_started > 0:
+            rl::play_sound(audio.explosion)
+        end
+        if g.impacts_started > 0:
+            rl::play_sound(audio.impact)
+        end
+    end
+
+    rl::begin_drawing()
+    draw_scene(g, mouse, _)
+    rl::end_drawing()
+end
+
+
+func main():
+    rl::init_window(960, 540, "Jik Missile Defence")
+    rl::set_target_fps(120)
+    rl::init_audio_device()
+
+    audio := GameAudio{
+        launch = rl::load_sound("assets/launch.wav", _),
+        explosion = rl::load_sound("assets/explosion.wav", _),
+        impact = rl::load_sound("assets/impact.wav", _)
+    }
+    rl::set_sound_volume(audio.launch, 0.45)
+    rl::set_sound_volume(audio.explosion, 0.55)
+    rl::set_sound_volume(audio.impact, 0.65)
+
+    g := game::new(_)
+    rng := rand::new_time(_)
+    while not rl::window_should_close():
+        run_frame(g, rng, audio)
+    end
+
+    rl::unload_sound(audio.launch)
+    rl::unload_sound(audio.explosion)
+    rl::unload_sound(audio.impact)
+    rl::close_audio_device()
+    rl::close_window()
+end

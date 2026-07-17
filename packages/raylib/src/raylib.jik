@@ -1,0 +1,400 @@
+//! Small raylib wrapper for basic 2D programs.
+//! Bundled native libraries target Windows/MinGW and Linux/GCC.
+
+@platform(windows)
+@includedir("../native/raylib-6.0_win64_mingw-w64/include")
+@libdir("../native/raylib-6.0_win64_mingw-w64/lib")
+@link("raylib", "opengl32", "gdi32", "winmm")
+
+@platform(linux)
+@includedir("../native/raylib-6.0_linux_amd64/include")
+@libdir("../native/raylib-6.0_linux_amd64/lib")
+@link(":libraylib.a", "X11", "m", "pthread", "dl")
+
+// -----------------------------------------------------------------------------
+// Types and constants
+// -----------------------------------------------------------------------------
+
+struct Vector2:
+    x: double
+    y: double
+end
+
+struct Color:
+    r: int
+    g: int
+    b: int
+    a: int
+end
+
+struct Rectangle:
+    x: double
+    y: double
+    width: double
+    height: double
+end
+
+extern struct jik_raylib_sound as Sound
+
+WHITE := Color{r = 255, g = 255, b = 255, a = 255}
+BLACK := Color{r = 0, g = 0, b = 0, a = 255}
+RED := Color{r = 230, g = 41, b = 55, a = 255}
+GREEN := Color{r = 0, g = 228, b = 48, a = 255}
+BLUE := Color{r = 0, g = 121, b = 241, a = 255}
+YELLOW := Color{r = 253, g = 249, b = 0, a = 255}
+RAYWHITE := Color{r = 245, g = 245, b = 245, a = 255}
+LIGHTGRAY := Color{r = 200, g = 200, b = 200, a = 255}
+DARKGRAY := Color{r = 80, g = 80, b = 80, a = 255}
+
+// Common raylib keyboard values.
+KEY_SPACE := 32
+KEY_W := 87
+KEY_S := 83
+KEY_ESCAPE := 256
+KEY_ENTER := 257
+KEY_LEFT := 263
+KEY_RIGHT := 262
+KEY_UP := 265
+KEY_DOWN := 264
+
+MOUSE_BUTTON_LEFT := 0
+MOUSE_BUTTON_RIGHT := 1
+MOUSE_BUTTON_MIDDLE := 2
+
+// -----------------------------------------------------------------------------
+// Native boundary
+// -----------------------------------------------------------------------------
+
+@embed{RAYLIB_C_END}
+
+#ifdef _WIN32
+#define Rectangle RaylibRectangle
+#define CloseWindow RaylibCloseWindow
+#define ShowCursor RaylibShowCursor
+
+#pragma push_macro("LoadImage")
+#pragma push_macro("DrawText")
+#pragma push_macro("DrawTextEx")
+#pragma push_macro("PlaySound")
+#undef LoadImage
+#undef DrawText
+#undef DrawTextEx
+#undef PlaySound
+#endif
+
+#include "raylib.h"
+
+#ifdef _WIN32
+#undef ShowCursor
+#undef CloseWindow
+#undef Rectangle
+
+extern void RaylibCloseWindow(void) __asm__("CloseWindow");
+#define JIK_RAYLIB_RECTANGLE RaylibRectangle
+#else
+#define JIK_RAYLIB_RECTANGLE Rectangle
+#endif
+
+static Color
+jik_raylib_color(int r, int g, int b, int a)
+{
+    return (Color){(unsigned char)r, (unsigned char)g,
+                   (unsigned char)b, (unsigned char)a};
+}
+
+static Vector2
+jik_raylib_vector2(double x, double y)
+{
+    return (Vector2){(float)x, (float)y};
+}
+
+static JIK_RAYLIB_RECTANGLE
+jik_raylib_rectangle(double x, double y, double width, double height)
+{
+    return (JIK_RAYLIB_RECTANGLE){(float)x, (float)y, (float)width, (float)height};
+}
+
+static void
+jik_raylib_init_window(int width, int height, JikString *title)
+{
+    InitWindow(width, height, title->data);
+}
+
+static void
+jik_raylib_set_window_title(JikString *title)
+{
+    SetWindowTitle(title->data);
+}
+
+static void
+jik_raylib_close_window(void)
+{
+#ifdef _WIN32
+    RaylibCloseWindow();
+#else
+    CloseWindow();
+#endif
+}
+
+static void
+jik_raylib_clear_background(int r, int g, int b, int a)
+{
+    ClearBackground(jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_pixel(double x, double y, int r, int g, int b, int a)
+{
+    DrawPixel((int)x, (int)y, jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_line(double x1, double y1, double x2, double y2,
+                     int r, int g, int b, int a)
+{
+    DrawLineV(jik_raylib_vector2(x1, y1),
+              jik_raylib_vector2(x2, y2),
+              jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_rectangle(double x, double y, double width, double height,
+                          int r, int g, int b, int a)
+{
+    DrawRectangleRec(jik_raylib_rectangle(x, y, width, height),
+                     jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_rectangle_lines(double x, double y, double width, double height,
+                                int r, int g, int b, int a)
+{
+    DrawRectangleLinesEx(jik_raylib_rectangle(x, y, width, height), 1.0f,
+                         jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_circle(double x, double y, double radius,
+                       int r, int g, int b, int a)
+{
+    DrawCircleV(jik_raylib_vector2(x, y), (float)radius,
+                jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_circle_lines(double x, double y, double radius,
+                             int r, int g, int b, int a)
+{
+    DrawCircleLinesV(jik_raylib_vector2(x, y), (float)radius,
+                     jik_raylib_color(r, g, b, a));
+}
+
+static void
+jik_raylib_draw_text(JikString *text, int x, int y, int size,
+                     int r, int g, int b, int a)
+{
+    DrawText(text->data, x, y, size, jik_raylib_color(r, g, b, a));
+}
+
+static int
+jik_raylib_measure_text(JikString *text, int size)
+{
+    return MeasureText(text->data, size);
+}
+
+static double
+jik_raylib_mouse_x(void)
+{
+    return (double)GetMousePosition().x;
+}
+
+static double
+jik_raylib_mouse_y(void)
+{
+    return (double)GetMousePosition().y;
+}
+
+typedef struct jik_raylib_sound {
+    Sound value;
+    bool loaded;
+} jik_raylib_sound;
+
+static jik_raylib_sound *
+jik_raylib_sound_new(JikRegion *region)
+{
+    jik_raylib_sound *sound = jik_region_alloc(region, sizeof(jik_raylib_sound));
+    sound->loaded = false;
+    return sound;
+}
+
+static jik_raylib_sound *
+jik_raylib_load_sound(JikString *path, JikRegion *region)
+{
+    jik_raylib_sound *sound = jik_raylib_sound_new(region);
+    if (IsAudioDeviceReady()) {
+        const char *filename = path->data;
+        if (!FileExists(filename)) {
+            const char *directory = GetApplicationDirectory();
+            size_t directory_len = strlen(directory);
+            bool has_separator = directory_len > 0 &&
+                (directory[directory_len - 1] == '/' || directory[directory_len - 1] == '\\');
+            char *beside_executable = jik_region_alloc(
+                region, directory_len + strlen(filename) + (has_separator ? 1 : 2));
+            snprintf(beside_executable,
+                     directory_len + strlen(filename) + (has_separator ? 1 : 2),
+                     has_separator ? "%s%s" : "%s/%s", directory, filename);
+            filename = beside_executable;
+        }
+        sound->value = LoadSound(filename);
+        sound->loaded = IsSoundValid(sound->value);
+    }
+    return sound;
+}
+
+static bool
+jik_raylib_is_sound_valid(jik_raylib_sound *sound)
+{
+    return sound->loaded;
+}
+
+static void
+jik_raylib_play_sound(jik_raylib_sound *sound)
+{
+    if (sound->loaded) {
+        PlaySound(sound->value);
+    }
+}
+
+static void
+jik_raylib_set_sound_volume(jik_raylib_sound *sound, double volume)
+{
+    if (sound->loaded) {
+        SetSoundVolume(sound->value, (float)volume);
+    }
+}
+
+static void
+jik_raylib_unload_sound(jik_raylib_sound *sound)
+{
+    if (sound->loaded) {
+        UnloadSound(sound->value);
+        sound->loaded = false;
+    }
+}
+
+#ifdef _WIN32
+#pragma pop_macro("PlaySound")
+#pragma pop_macro("DrawTextEx")
+#pragma pop_macro("DrawText")
+#pragma pop_macro("LoadImage")
+#endif
+
+RAYLIB_C_END
+
+extern func jik_raylib_init_window as
+    init_window(width: int, height: int, foreign title: String) -> void
+extern func jik_raylib_close_window as close_window() -> void
+extern func WindowShouldClose as window_should_close() -> bool
+extern func IsWindowReady as is_window_ready() -> bool
+extern func jik_raylib_set_window_title as
+    set_window_title(foreign title: String) -> void
+extern func GetScreenWidth as get_screen_width() -> int
+extern func GetScreenHeight as get_screen_height() -> int
+
+extern func BeginDrawing as begin_drawing() -> void
+extern func EndDrawing as end_drawing() -> void
+extern func SetTargetFPS as set_target_fps(fps: int) -> void
+extern func GetFrameTime as get_frame_time() -> double
+extern func GetTime as get_time() -> double
+extern func GetFPS as get_fps() -> int
+
+extern func jik_raylib_clear_background as
+    _clear_background(r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_pixel as
+    _draw_pixel(x: double, y: double, r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_line as
+    _draw_line(x1: double, y1: double, x2: double, y2: double,
+               r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_rectangle as
+    _draw_rectangle(x: double, y: double, width: double, height: double,
+                    r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_rectangle_lines as
+    _draw_rectangle_lines(x: double, y: double, width: double, height: double,
+                          r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_circle as
+    _draw_circle(x: double, y: double, radius: double,
+                 r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_circle_lines as
+    _draw_circle_lines(x: double, y: double, radius: double,
+                       r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_draw_text as
+    _draw_text(foreign text: String, x: int, y: int, size: int,
+               r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_measure_text as
+    measure_text(foreign text: String, size: int) -> int
+
+extern func IsKeyPressed as is_key_pressed(key: int) -> bool
+extern func IsKeyDown as is_key_down(key: int) -> bool
+extern func IsKeyReleased as is_key_released(key: int) -> bool
+extern func IsKeyUp as is_key_up(key: int) -> bool
+extern func IsMouseButtonPressed as is_mouse_button_pressed(button: int) -> bool
+extern func IsMouseButtonDown as is_mouse_button_down(button: int) -> bool
+extern func jik_raylib_mouse_x as _mouse_x() -> double
+extern func jik_raylib_mouse_y as _mouse_y() -> double
+extern func GetMouseWheelMove as get_mouse_wheel_move() -> double
+
+extern func InitAudioDevice as init_audio_device() -> void
+extern func CloseAudioDevice as close_audio_device() -> void
+extern func IsAudioDeviceReady as is_audio_device_ready() -> bool
+extern init func jik_raylib_sound_new as empty_sound(region: Region) -> Sound
+extern func jik_raylib_load_sound as
+    load_sound(foreign path: String, region: Region) -> Sound
+extern func jik_raylib_is_sound_valid as is_sound_valid(sound: Sound) -> bool
+extern func jik_raylib_play_sound as play_sound(sound: Sound) -> void
+extern func jik_raylib_set_sound_volume as
+    set_sound_volume(sound: Sound, volume: double) -> void
+extern func jik_raylib_unload_sound as unload_sound(sound: Sound) -> void
+
+// -----------------------------------------------------------------------------
+// Drawing helpers
+// -----------------------------------------------------------------------------
+
+func clear_background(foreign color: Color):
+    _clear_background(color.r, color.g, color.b, color.a)
+end
+
+func draw_pixel(foreign position: Vector2, foreign color: Color):
+    _draw_pixel(position.x, position.y, color.r, color.g, color.b, color.a)
+end
+
+func draw_line(foreign start: Vector2, foreign finish: Vector2, foreign color: Color):
+    _draw_line(start.x, start.y, finish.x, finish.y,
+               color.r, color.g, color.b, color.a)
+end
+
+func draw_rectangle(foreign rectangle: Rectangle, foreign color: Color):
+    _draw_rectangle(rectangle.x, rectangle.y, rectangle.width, rectangle.height,
+                    color.r, color.g, color.b, color.a)
+end
+
+func draw_rectangle_lines(foreign rectangle: Rectangle, foreign color: Color):
+    _draw_rectangle_lines(rectangle.x, rectangle.y,
+                          rectangle.width, rectangle.height,
+                          color.r, color.g, color.b, color.a)
+end
+
+func draw_circle(foreign center: Vector2, radius: double, foreign color: Color):
+    _draw_circle(center.x, center.y, radius, color.r, color.g, color.b, color.a)
+end
+
+func draw_circle_lines(foreign center: Vector2, radius: double, foreign color: Color):
+    _draw_circle_lines(center.x, center.y, radius, color.r, color.g, color.b, color.a)
+end
+
+func draw_text(foreign text: String, x: int, y: int, size: int, foreign color: Color):
+    _draw_text(text, x, y, size, color.r, color.g, color.b, color.a)
+end
+
+func get_mouse_position(r: Region) -> Vector2:
+    return Vector2{x = _mouse_x(), y = _mouse_y()}[r]
+end

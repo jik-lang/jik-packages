@@ -1,0 +1,17 @@
+use "jik/testing" as test
+use "../src/raylib"
+
+func run_tests(ts):
+    test::suite_assert(ts, raylib::WHITE.r == 255, site())
+    test::suite_assert(ts, raylib::WHITE.a == 255, site())
+    test::suite_assert(ts, raylib::KEY_ESCAPE == 256, site())
+    test::suite_assert(ts, raylib::MOUSE_BUTTON_LEFT == 0, site())
+    sound := raylib::Sound{}
+    test::suite_assert(ts, not raylib::is_sound_valid(sound), site())
+end
+
+func main():
+    ts := test::suite_new(_)
+    run_tests(ts)
+    test::suite_finish(ts)
+end
