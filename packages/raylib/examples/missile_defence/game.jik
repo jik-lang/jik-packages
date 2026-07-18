@@ -26,6 +26,7 @@ MAX_EXPLOSIONS := 64
 enum GameState:
     TITLE
     PLAYING
+    PAUSED
     GAME_OVER
 end
 
@@ -231,16 +232,16 @@ end
 
 func _enemy_speed(g: Game) -> double:
     multiplier := 1.0
-    growth := 0.08
+    growth := 0.10
     if g.difficulty == Difficulty.EASY:
-        multiplier = 0.85
-        growth = 0.05
+        multiplier = 0.70
+        growth = 0.035
     elif g.difficulty == Difficulty.HARD:
-        multiplier = 1.15
-        growth = 0.11
+        multiplier = 1.35
+        growth = 0.18
     elif g.difficulty == Difficulty.EXPERT:
-        multiplier = 1.30
-        growth = 0.14
+        multiplier = 1.70
+        growth = 0.27
     end
     return ENEMY_BASE_SPEED * multiplier * (1.0 + growth * (g.wave - 1))
 end
@@ -250,13 +251,14 @@ func _player_missile_speed(g: Game) -> double:
     multiplier := 1.0
     growth := 0.04
     if g.difficulty == Difficulty.EASY:
-        multiplier = 1.10
-        growth = 0.03
+        multiplier = 1.25
+        growth = 0.02
     elif g.difficulty == Difficulty.HARD:
-        multiplier = 0.95
-    elif g.difficulty == Difficulty.EXPERT:
-        multiplier = 0.90
+        multiplier = 0.88
         growth = 0.03
+    elif g.difficulty == Difficulty.EXPERT:
+        multiplier = 0.78
+        growth = 0.02
     end
     return PLAYER_MISSILE_SPEED * multiplier * (1.0 + growth * (g.wave - 1))
 end
@@ -312,7 +314,7 @@ func _reset_sites(g: Game):
     end
     for battery in g.batteries:
         battery.alive = true
-        battery.ammo = BATTERY_AMMO
+        battery.ammo = _battery_ammo(g)
     end
 end
 
@@ -330,13 +332,41 @@ func _clear_pools(g: Game):
 end
 
 
+func _battery_ammo(g: Game) -> int:
+    if g.difficulty == Difficulty.EASY:
+        return 14
+    end
+    if g.difficulty == Difficulty.HARD:
+        return 8
+    end
+    if g.difficulty == Difficulty.EXPERT:
+        return 6
+    end
+    return BATTERY_AMMO
+end
+
+
+func _enemies_per_wave(g: Game) -> int:
+    if g.difficulty == Difficulty.EASY:
+        return 4 + g.wave * 2
+    end
+    if g.difficulty == Difficulty.HARD:
+        return 8 + g.wave * 3
+    end
+    if g.difficulty == Difficulty.EXPERT:
+        return 12 + g.wave * 4
+    end
+    return 5 + g.wave * 2
+end
+
+
 func _begin_wave(g: Game):
-    g.enemies_to_spawn = 5 + g.wave * 2
+    g.enemies_to_spawn = _enemies_per_wave(g)
     g.spawn_timer = 1.0
     g.wave_clear_timer = 0.0
     for battery in g.batteries:
         if battery.alive:
-            battery.ammo = BATTERY_AMMO
+            battery.ammo = _battery_ammo(g)
         end
     end
 end
@@ -349,6 +379,32 @@ func start(g: Game):
     g.score = 0
     g.wave = 1
     _begin_wave(g)
+end
+
+
+func pause(g: Game):
+    if g.state == GameState.PLAYING:
+        g.state = GameState.PAUSED
+    end
+end
+
+
+func resume(g: Game):
+    if g.state == GameState.PAUSED:
+        g.state = GameState.PLAYING
+    end
+end
+
+
+func return_to_title(g: Game):
+    _clear_pools(g)
+    _reset_sites(g)
+    g.score = 0
+    g.wave = 0
+    g.enemies_to_spawn = 0
+    g.spawn_timer = 0.0
+    g.wave_clear_timer = 0.0
+    g.state = GameState.TITLE
 end
 
 
@@ -592,9 +648,17 @@ func _update_explosions(g: Game, dt: double):
 end
 
 
-func _spawn_interval(wave: int) -> double:
-    interval := 1.15 - (wave - 1) * 0.06
-    return math::max(interval, 0.38)
+func _spawn_interval(g: Game) -> double:
+    interval := 1.15 - (g.wave - 1) * 0.06
+    multiplier := 1.0
+    if g.difficulty == Difficulty.EASY:
+        multiplier = 1.25
+    elif g.difficulty == Difficulty.HARD:
+        multiplier = 0.78
+    elif g.difficulty == Difficulty.EXPERT:
+        multiplier = 0.60
+    end
+    return math::max(interval * multiplier, 0.20)
 end
 
 
@@ -604,7 +668,7 @@ func _update_wave(g: Game, rng: rand::Rng, dt: double):
         if g.spawn_timer <= 0.0:
             _spawn_enemy(g, rng)
             g.enemies_to_spawn -= 1
-            g.spawn_timer = _spawn_interval(g.wave)
+            g.spawn_timer = _spawn_interval(g)
         end
         return
     end

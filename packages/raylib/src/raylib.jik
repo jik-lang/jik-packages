@@ -48,6 +48,8 @@ DARKGRAY := Color{r = 80, g = 80, b = 80, a = 255}
 
 // Common raylib keyboard values.
 KEY_SPACE := 32
+KEY_M := 77
+KEY_P := 80
 KEY_W := 87
 KEY_S := 83
 KEY_ESCAPE := 256

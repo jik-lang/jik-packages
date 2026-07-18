@@ -154,6 +154,7 @@ func draw_hud(foreign g: game::Game, r: Region):
     rl::draw_text(wave_text, 390, 15, 20, rl::WHITE)
     rl::draw_text(difficulty_text, 500, 15, 20, CYAN)
     rl::draw_text(cities_text, 824, 15, 20, rl::WHITE)
+    rl::draw_text("P PAUSE   M MENU"[r], 18, 42, 16, rl::LIGHTGRAY)
 end
 
 
@@ -197,14 +198,29 @@ func draw_scene(foreign g: game::Game, foreign mouse: rl::Vector2, r: Region):
         elif g.difficulty == game::Difficulty.EXPERT:
             difficulty_text = "DIFFICULTY: EXPERT  (LEFT/RIGHT)"[r]
         end
-        draw_centered(difficulty_text, 286, 20, CYAN)
-        draw_centered("Left click to fire"[r], 326, 20, rl::LIGHTGRAY)
-        draw_centered("Press Enter or Space to start"[r], 362, 20, CYAN)
+        draw_centered(difficulty_text, 280, 20, CYAN)
+        detail_text := "BALANCED ENEMIES, 10 MISSILES PER BATTERY"[r]
+        if g.difficulty == game::Difficulty.EASY:
+            detail_text = "SLOWER ENEMIES, 14 MISSILES PER BATTERY"[r]
+        elif g.difficulty == game::Difficulty.HARD:
+            detail_text = "FASTER, MORE NUMEROUS ENEMIES, 8 MISSILES"[r]
+        elif g.difficulty == game::Difficulty.EXPERT:
+            detail_text = "RELENTLESS ENEMIES, 6 MISSILES PER BATTERY"[r]
+        end
+        draw_centered(detail_text, 318, 18, rl::LIGHTGRAY)
+        draw_centered("Left click to fire"[r], 352, 20, rl::LIGHTGRAY)
+        draw_centered("Press Enter or Space to start"[r], 388, 20, CYAN)
+    elif g.state == game::GameState.PAUSED:
+        draw_hud(g, r)
+        draw_centered("PAUSED"[r], 200, 48, CYAN)
+        draw_centered("Press P, Enter, or Space to resume"[r], 272, 22, rl::WHITE)
+        draw_centered("Press M to return to the main menu"[r], 312, 20, rl::LIGHTGRAY)
     else:
         draw_centered("GAME OVER"[r], 180, 48, ORANGE)
         score_text := concat("FINAL SCORE "[r], string::from_int(g.score, r), r)
         draw_centered(score_text, 252, 24, rl::WHITE)
         draw_centered("Press Enter or Space to restart"[r], 316, 20, CYAN)
+        draw_centered("Press M to return to the main menu"[r], 352, 20, rl::LIGHTGRAY)
     end
 end
 
@@ -214,32 +230,58 @@ func wants_start() -> bool:
 end
 
 
+func wants_menu() -> bool:
+    return rl::is_key_pressed(rl::KEY_M)
+end
+
+
+func wants_pause() -> bool:
+    return rl::is_key_pressed(rl::KEY_P)
+end
+
+
 func run_frame(g: game::Game, rng: rand::Rng, audio: GameAudio):
     mouse := rl::get_mouse_position(_)
 
-    if g.state == game::GameState.TITLE or g.state == game::GameState.GAME_OVER:
-        if g.state == game::GameState.TITLE:
-            if rl::is_key_pressed(rl::KEY_LEFT):
-                game::change_difficulty(g, -1)
-            elif rl::is_key_pressed(rl::KEY_RIGHT):
-                game::change_difficulty(g, 1)
-            end
+    if g.state == game::GameState.TITLE:
+        if rl::is_key_pressed(rl::KEY_LEFT):
+            game::change_difficulty(g, -1)
+        elif rl::is_key_pressed(rl::KEY_RIGHT):
+            game::change_difficulty(g, 1)
         end
         if wants_start():
             game::start(g)
         end
+    elif g.state == game::GameState.GAME_OVER:
+        if wants_menu():
+            game::return_to_title(g)
+        elif wants_start():
+            game::start(g)
+        end
+    elif g.state == game::GameState.PAUSED:
+        if wants_menu():
+            game::return_to_title(g)
+        elif wants_pause() or wants_start():
+            game::resume(g)
+        end
     else:
-        if rl::is_mouse_button_pressed(rl::MOUSE_BUTTON_LEFT):
-            if game::fire(g, mouse.x, mouse.y):
-                rl::play_sound(audio.launch)
+        if wants_menu():
+            game::return_to_title(g)
+        elif wants_pause():
+            game::pause(g)
+        else:
+            if rl::is_mouse_button_pressed(rl::MOUSE_BUTTON_LEFT):
+                if game::fire(g, mouse.x, mouse.y):
+                    rl::play_sound(audio.launch)
+                end
             end
-        end
-        game::update(g, rng, rl::get_frame_time())
-        if g.explosions_started > 0:
-            rl::play_sound(audio.explosion)
-        end
-        if g.impacts_started > 0:
-            rl::play_sound(audio.impact)
+            game::update(g, rng, rl::get_frame_time())
+            if g.explosions_started > 0:
+                rl::play_sound(audio.explosion)
+            end
+            if g.impacts_started > 0:
+                rl::play_sound(audio.impact)
+            end
         end
     end
 

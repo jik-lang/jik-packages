@@ -6,12 +6,12 @@ It requires Windows or Linux x86-64 with MinGW-w64 GCC or GCC respectively.
 
 The showcase includes:
 
-- title, play, wave, game-over, and restart states
+- title, play, pause, wave, game-over, restart, and return-to-menu states
 - mouse targeting and battery selection
 - player and enemy missile movement based on frame time
 - expanding explosions and chained interceptions
 - destructible cities and batteries
-- score, ammunition, four difficulty levels, and increasing wave speed
+- score, ammunition, four clearly differentiated difficulty levels, and increasing wave speed
 - bounded reusable pools for missiles and explosions
 - original launch, explosion, and impact sound effects
 
@@ -37,11 +37,13 @@ beside that executable so the sound effects can be loaded.
 
 - Left/Right: choose Easy, Normal, Hard, or Expert on the title screen
 - Enter or Space: start or restart
+- P: pause or resume a game
+- M: return to the main menu from a game, pause screen, or game-over screen
 - Mouse: aim
 - Left mouse button: launch from the nearest living battery with ammunition
 - Escape or the window close button: exit
 
 Shots below the sky are ignored. Each living battery is refilled at the start
-of a wave. Each wave makes enemy and player missiles faster. Enemy speed grows
-faster, with the selected difficulty setting changing their starting speed and
-growth rate.
+of a wave. Difficulty changes enemy speed, wave growth, enemy count, spawn rate,
+player missile speed, and ammunition: Easy is forgiving, while Expert starts
+with a larger, faster barrage and only six missiles per battery.
