@@ -1,0 +1,43 @@
+//! Load a CC0 PNG spritesheet, scale it with point filtering, and crop one tile.
+
+use "pkg/raylib" as rl
+
+
+func main():
+    rl::init_window(960, 620, "Jik raylib texture demo")
+    rl::set_target_fps(60)
+
+    texture := rl::load_texture("assets/tileset_pixel_cc0.png", _)
+    if rl::is_texture_valid(texture):
+        rl::set_texture_filter_point(texture)
+    end
+
+    while not rl::window_should_close():
+        rl::begin_drawing()
+        rl::clear_background(rl::DARKGRAY)
+
+        if rl::is_texture_valid(texture):
+            width := rl::texture_width(texture) * 1.0
+            height := rl::texture_height(texture) * 1.0
+            full := rl::Rectangle{x = 0.0, y = 0.0, width = width, height = height}
+            rl::draw_texture_rect(texture, full,
+                                  rl::Rectangle{x = 42.0, y = 112.0, width = 390.0, height = 390.0},
+                                  rl::WHITE)
+
+            crop := rl::Rectangle{x = 52.0, y = 52.0, width = 22.0, height = 22.0}
+            rl::draw_texture_rect(texture, crop,
+                                  rl::Rectangle{x = 550.0, y = 187.0, width = 250.0, height = 250.0},
+                                  rl::WHITE)
+            rl::draw_text("Full CC0 spritesheet", 42, 70, 25, rl::RAYWHITE)
+            rl::draw_text("One 22 x 22 source region, scaled 10x", 516, 140, 21, rl::RAYWHITE)
+        else:
+            rl::draw_text("Could not load assets/tileset_pixel_cc0.png", 100, 280, 28, rl::RED)
+        end
+
+        rl::draw_text("Esc closes the demo", 366, 570, 18, rl::LIGHTGRAY)
+        rl::end_drawing()
+    end
+
+    rl::unload_texture(texture)
+    rl::close_window()
+end

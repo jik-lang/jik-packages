@@ -13,9 +13,9 @@ Linux x86-64 with MinGW-w64 GCC and GCC respectively. It bundles and statically
 links raylib 6.0, so applications do not need a separate raylib library beside
 the executable.
 
-The wrapper exposes 2D windows, drawing, input, and short sound effects. It
-does not expose raylib image, texture, custom-font, music-streaming, or 3D
-APIs yet.
+The wrapper exposes 2D windows, drawing, texture loading and drawing, input,
+and short sound effects. It does not expose CPU-side raylib `Image` editing,
+custom fonts, music streaming, or 3D APIs yet.
 
 ## Relationship to raylib
 
@@ -66,9 +66,10 @@ end
 These are Jik values converted at the native boundary; they are not binary
 copies of raylib's C structs.
 
-`Sound` is an opaque handle for a native raylib sound. `Sound{}` creates an
-unloaded handle on which the sound operations are safe no-ops. Sound data must
-still be released explicitly with `unload_sound`.
+`Sound` and `Texture` are opaque handles for native raylib resources.
+`Sound{}` and `Texture{}` create unloaded handles on which their resource
+operations are safe no-ops. Loaded sounds and textures must still be released
+explicitly with `unload_sound` and `unload_texture`.
 
 ## Constants
 
@@ -139,6 +140,49 @@ Jik API accepts a `Vector2` center:
 center := raylib::Vector2{x = 400.0, y = 225.0}
 raylib::draw_circle(center, 30.0, raylib::BLUE)
 ```
+
+## Textures
+
+Texture operations load an image file directly into GPU texture memory. PNG is
+supported, along with the other file types supported by the bundled raylib
+build. The wrapper does not expose CPU-side `Image` data or image editing.
+
+| Jik API | Native raylib | Wrapper behavior |
+|---|---|---|
+| `Texture{}` | None | Creates an unloaded opaque texture handle. |
+| `load_texture(path, region) -> Texture` | [`LoadTexture`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1441) | Loads the path after a window is initialized. If the path is not found from the working directory, also tries beside the executable. |
+| `is_texture_valid(texture) -> bool` | [`IsTextureValid`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1445) | Reports whether the texture loaded successfully. |
+| `texture_width(texture) -> int` | `Texture2D.width` | Returns zero for an unloaded texture. |
+| `texture_height(texture) -> int` | `Texture2D.height` | Returns zero for an unloaded texture. |
+| `set_texture_filter_point(texture)` | [`SetTextureFilter`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1454) | Sets nearest-neighbour filtering for crisp pixel-art scaling. |
+| `draw_texture_rect(texture, source, destination, tint)` | [`DrawTexturePro`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1462) | Draws a source rectangle from the texture into a destination rectangle. `WHITE` keeps the original colors. |
+| `unload_texture(texture)` | [`UnloadTexture`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1446) | Releases a valid texture once and marks the shared handle invalid. |
+
+Load textures after `init_window` and unload them before `close_window`:
+
+```jik
+texture := raylib::load_texture("assets/tiles.png", _)
+if raylib::is_texture_valid(texture):
+    raylib::set_texture_filter_point(texture)
+end
+
+while not raylib::window_should_close():
+    raylib::begin_drawing()
+    raylib::clear_background(raylib::BLACK)
+    raylib::draw_texture_rect(
+        texture,
+        raylib::Rectangle{x = 0.0, y = 0.0, width = 16.0, height = 16.0},
+        raylib::Rectangle{x = 80.0, y = 80.0, width = 64.0, height = 64.0},
+        raylib::WHITE)
+    raylib::end_drawing()
+end
+
+raylib::unload_texture(texture)
+```
+
+The `source` rectangle enables spritesheets: change its `x` and `y` values to
+select an animation frame, then choose the scaled on-screen size through the
+`destination` rectangle.
 
 ## Input
 

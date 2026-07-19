@@ -29,13 +29,14 @@ This package provides:
 
 - window and frame lifecycle
 - basic 2D drawing
+- texture loading, point filtering, and source/destination rectangle drawing
 - default-font text drawing and measurement
 - keyboard and mouse polling
 - short sound loading and playback
 - common colors and input constants
 
-It does not expose raylib image, texture, custom-font, music-streaming, or 3D
-APIs.
+It does not expose CPU-side image manipulation, custom-font, music-streaming,
+or 3D APIs.
 
 Import it with:
 
@@ -68,6 +69,16 @@ frame-time-based movement, and the basic drawing loop:
 
 ```sh
 jik run packages/raylib/examples/input_and_animation.jik
+```
+
+### Texture demo
+
+The texture demo loads its bundled PNG, draws it scaled with point filtering,
+and draws a cropped source rectangle. It is a minimal reference for loading
+tilesets and spritesheets:
+
+```sh
+jik run packages/raylib/examples/texture_demo.jik
 ```
 
 ### Pong

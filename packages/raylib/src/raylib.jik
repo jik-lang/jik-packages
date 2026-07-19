@@ -35,6 +35,7 @@ struct Rectangle:
 end
 
 extern struct jik_raylib_sound as Sound
+extern struct jik_raylib_texture as Texture
 
 WHITE := Color{r = 255, g = 255, b = 255, a = 255}
 BLACK := Color{r = 0, g = 0, b = 0, a = 255}
@@ -216,6 +217,26 @@ jik_raylib_mouse_y(void)
     return (double)GetMousePosition().y;
 }
 
+static const char *
+jik_raylib_find_asset(JikString *path, JikRegion *region)
+{
+    const char *filename = path->data;
+    if (FileExists(filename)) {
+        return filename;
+    }
+
+    const char *directory = GetApplicationDirectory();
+    size_t directory_len = strlen(directory);
+    bool has_separator = directory_len > 0 &&
+        (directory[directory_len - 1] == '/' || directory[directory_len - 1] == '\\');
+    size_t path_len = strlen(filename);
+    size_t result_len = directory_len + path_len + (has_separator ? 1 : 2);
+    char *beside_executable = jik_region_alloc(region, result_len);
+    snprintf(beside_executable, result_len,
+             has_separator ? "%s%s" : "%s/%s", directory, filename);
+    return beside_executable;
+}
+
 typedef struct jik_raylib_sound {
     Sound value;
     bool loaded;
@@ -234,20 +255,7 @@ jik_raylib_load_sound(JikString *path, JikRegion *region)
 {
     jik_raylib_sound *sound = jik_raylib_sound_new(region);
     if (IsAudioDeviceReady()) {
-        const char *filename = path->data;
-        if (!FileExists(filename)) {
-            const char *directory = GetApplicationDirectory();
-            size_t directory_len = strlen(directory);
-            bool has_separator = directory_len > 0 &&
-                (directory[directory_len - 1] == '/' || directory[directory_len - 1] == '\\');
-            char *beside_executable = jik_region_alloc(
-                region, directory_len + strlen(filename) + (has_separator ? 1 : 2));
-            snprintf(beside_executable,
-                     directory_len + strlen(filename) + (has_separator ? 1 : 2),
-                     has_separator ? "%s%s" : "%s/%s", directory, filename);
-            filename = beside_executable;
-        }
-        sound->value = LoadSound(filename);
+        sound->value = LoadSound(jik_raylib_find_asset(path, region));
         sound->loaded = IsSoundValid(sound->value);
     }
     return sound;
@@ -281,6 +289,89 @@ jik_raylib_unload_sound(jik_raylib_sound *sound)
     if (sound->loaded) {
         UnloadSound(sound->value);
         sound->loaded = false;
+    }
+}
+
+typedef struct jik_raylib_texture {
+    Texture2D value;
+    bool loaded;
+} jik_raylib_texture;
+
+static jik_raylib_texture *
+jik_raylib_texture_new(JikRegion *region)
+{
+    jik_raylib_texture *texture = jik_region_alloc(region, sizeof(jik_raylib_texture));
+    texture->value = (Texture2D){0};
+    texture->loaded = false;
+    return texture;
+}
+
+static jik_raylib_texture *
+jik_raylib_load_texture(JikString *path, JikRegion *region)
+{
+    jik_raylib_texture *texture = jik_raylib_texture_new(region);
+    if (IsWindowReady()) {
+        texture->value = LoadTexture(jik_raylib_find_asset(path, region));
+        texture->loaded = IsTextureValid(texture->value);
+    }
+    return texture;
+}
+
+static bool
+jik_raylib_is_texture_valid(jik_raylib_texture *texture)
+{
+    return texture->loaded;
+}
+
+static int
+jik_raylib_texture_width(jik_raylib_texture *texture)
+{
+    if (texture->loaded) {
+        return texture->value.width;
+    }
+    return 0;
+}
+
+static int
+jik_raylib_texture_height(jik_raylib_texture *texture)
+{
+    if (texture->loaded) {
+        return texture->value.height;
+    }
+    return 0;
+}
+
+static void
+jik_raylib_set_texture_filter_point(jik_raylib_texture *texture)
+{
+    if (texture->loaded) {
+        SetTextureFilter(texture->value, TEXTURE_FILTER_POINT);
+    }
+}
+
+static void
+jik_raylib_draw_texture_rect(jik_raylib_texture *texture,
+                             double source_x, double source_y,
+                             double source_width, double source_height,
+                             double dest_x, double dest_y,
+                             double dest_width, double dest_height,
+                             int r, int g, int b, int a)
+{
+    if (texture->loaded) {
+        DrawTexturePro(texture->value,
+                       jik_raylib_rectangle(source_x, source_y, source_width, source_height),
+                       jik_raylib_rectangle(dest_x, dest_y, dest_width, dest_height),
+                       (Vector2){0.0f, 0.0f}, 0.0f,
+                       jik_raylib_color(r, g, b, a));
+    }
+}
+
+static void
+jik_raylib_unload_texture(jik_raylib_texture *texture)
+{
+    if (texture->loaded) {
+        UnloadTexture(texture->value);
+        texture->loaded = false;
     }
 }
 
@@ -357,6 +448,20 @@ extern func jik_raylib_set_sound_volume as
     set_sound_volume(sound: Sound, volume: double) -> void
 extern func jik_raylib_unload_sound as unload_sound(sound: Sound) -> void
 
+extern init func jik_raylib_texture_new as empty_texture(region: Region) -> Texture
+extern func jik_raylib_load_texture as
+    load_texture(foreign path: String, region: Region) -> Texture
+extern func jik_raylib_is_texture_valid as is_texture_valid(texture: Texture) -> bool
+extern func jik_raylib_texture_width as texture_width(texture: Texture) -> int
+extern func jik_raylib_texture_height as texture_height(texture: Texture) -> int
+extern func jik_raylib_set_texture_filter_point as set_texture_filter_point(texture: Texture) -> void
+extern func jik_raylib_draw_texture_rect as
+    _draw_texture_rect(texture: Texture,
+                       source_x: double, source_y: double, source_width: double, source_height: double,
+                       dest_x: double, dest_y: double, dest_width: double, dest_height: double,
+                       r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_unload_texture as unload_texture(texture: Texture) -> void
+
 // -----------------------------------------------------------------------------
 // Drawing helpers
 // -----------------------------------------------------------------------------
@@ -395,6 +500,14 @@ end
 
 func draw_text(foreign text: String, x: int, y: int, size: int, foreign color: Color):
     _draw_text(text, x, y, size, color.r, color.g, color.b, color.a)
+end
+
+func draw_texture_rect(texture: Texture, foreign source: Rectangle,
+                       foreign destination: Rectangle, foreign tint: Color):
+    _draw_texture_rect(texture,
+                       source.x, source.y, source.width, source.height,
+                       destination.x, destination.y, destination.width, destination.height,
+                       tint.r, tint.g, tint.b, tint.a)
 end
 
 func get_mouse_position(r: Region) -> Vector2:

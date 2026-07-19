@@ -8,6 +8,10 @@ func run_tests(ts):
     test::suite_assert(ts, raylib::MOUSE_BUTTON_LEFT == 0, site())
     sound := raylib::Sound{}
     test::suite_assert(ts, not raylib::is_sound_valid(sound), site())
+    texture := raylib::Texture{}
+    test::suite_assert(ts, not raylib::is_texture_valid(texture), site())
+    test::suite_assert(ts, raylib::texture_width(texture) == 0, site())
+    test::suite_assert(ts, raylib::texture_height(texture) == 0, site())
 end
 
 func main():
