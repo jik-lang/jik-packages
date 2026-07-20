@@ -384,13 +384,17 @@ jik_raylib_unload_texture(jik_raylib_texture *texture)
 
 RAYLIB_C_END
 
+// -----------------------------------------------------------------------------
+// Jik API
+// -----------------------------------------------------------------------------
+
 extern func jik_raylib_init_window as
-    init_window(width: int, height: int, foreign title: String) -> void
+    init_window(width: int, height: int, title: String) -> void
 extern func jik_raylib_close_window as close_window() -> void
 extern func WindowShouldClose as window_should_close() -> bool
 extern func IsWindowReady as is_window_ready() -> bool
 extern func jik_raylib_set_window_title as
-    set_window_title(foreign title: String) -> void
+    set_window_title(title: String) -> void
 extern func GetScreenWidth as get_screen_width() -> int
 extern func GetScreenHeight as get_screen_height() -> int
 
@@ -421,10 +425,10 @@ extern func jik_raylib_draw_circle_lines as
     _draw_circle_lines(x: double, y: double, radius: double,
                        r: int, g: int, b: int, a: int) -> void
 extern func jik_raylib_draw_text as
-    _draw_text(foreign text: String, x: int, y: int, size: int,
+    _draw_text(text: String, x: int, y: int, size: int,
                r: int, g: int, b: int, a: int) -> void
 extern func jik_raylib_measure_text as
-    measure_text(foreign text: String, size: int) -> int
+    measure_text(text: String, size: int) -> int
 
 extern func IsKeyPressed as is_key_pressed(key: int) -> bool
 extern func IsKeyDown as is_key_down(key: int) -> bool
@@ -466,7 +470,7 @@ extern func jik_raylib_unload_texture as unload_texture(texture: Texture) -> voi
 // Drawing helpers
 // -----------------------------------------------------------------------------
 
-func clear_background(foreign color: Color):
+func clear_background(color: Color):
     _clear_background(color.r, color.g, color.b, color.a)
 end
 
