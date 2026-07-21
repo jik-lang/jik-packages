@@ -9,7 +9,7 @@ Example:
 ```jik
 use "pkg/argparse"
 
-func main(args):
+func main():
     ap := argparse::new(_)
     argparse::add_positional(ap, "input", "Input file.")
 
@@ -17,12 +17,15 @@ func main(args):
     argparse::add_option_positional(output, "file", "Output path.")
 
     argparse::add_option(ap, "--verbose", "-v", "Show extra output.")
+    
+    args := ["in.txt", "--output", "out.txt", "-v"]
     result := must argparse::parse(ap, args, _)
 
     input := result.positionals["input"]?
     output_path := result.options["--output"]?["file"]?
     if result.options["--verbose"] is Some:
         println("Reading ", input)
+        println("Writing to ", output_path)
     end
 end
 ```
