@@ -43,6 +43,7 @@ Run `jik env` to check the resolved package path. It is printed as
 
 ## Packages
 
+- [`argparse`](packages/argparse) - command-line argument parser
 - [`csv`](packages/csv) - CSV parser
 - [`raylib`](packages/raylib) - Small 2D raylib wrapper
 - [`toml`](packages/toml) - TOML parser

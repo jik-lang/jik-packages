@@ -1,10 +1,12 @@
 use "jik/testing" as test
+use "../packages/argparse/test/test_argparse"
 use "../packages/csv/test/test_csv"
 use "../packages/toml/test/test_toml"
 
 
 func main():
     ts := test::suite_new(_)
+    test_argparse::run_tests(ts)
     test_csv::run_tests(ts)
     test_toml::run_tests(ts)
     test::suite_finish(ts)
