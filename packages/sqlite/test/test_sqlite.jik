@@ -1,0 +1,56 @@
+use "jik/testing" as test
+use "../src/sqlite"
+
+
+func test_open_and_exec(ts):
+    database := must sqlite::open(":memory:", _)
+    must sqlite::exec(database, "create table item (id integer primary key, name text)")
+    must sqlite::exec(database, "insert into item (name) values ('Jik')")
+    try sqlite::exec(database, "not valid sql"):
+        test::suite_assert(ts, false, site())
+    except:
+        test::suite_assert(ts, true, site())
+    end
+    must sqlite::close(database)
+end
+
+func test_prepared_statement(ts):
+    database := must sqlite::open(":memory:", _)
+    must sqlite::exec(database,
+        "create table person (id integer, name text, score real, nickname text)")
+
+    insert := must sqlite::prepare(database,
+        "insert into person (id, name, score, nickname) values (?, ?, ?, ?)", _)
+    must sqlite::bind_int(insert, 1, 7)
+    must sqlite::bind_text(insert, 2, "Ada")
+    must sqlite::bind_float(insert, 3, 9.5)
+    must sqlite::bind_null(insert, 4)
+    inserted := must sqlite::step(insert)
+    test::suite_assert(ts, not inserted, site())
+    must sqlite::finalize(insert)
+
+    query := must sqlite::prepare(database,
+        "select id, name, score, nickname from person where name = ?", _)
+    must sqlite::bind_text(query, 1, "Ada")
+    has_row := must sqlite::step(query)
+    test::suite_assert(ts, has_row, site())
+    test::suite_assert(ts, must sqlite::column_int(query, 0) == 7, site())
+    test::suite_assert(ts, must sqlite::column_text(query, 1, _) == "Ada", site())
+    test::suite_assert(ts, must sqlite::column_float(query, 2) == 9.5, site())
+    test::suite_assert(ts, must sqlite::column_is_null(query, 3), site())
+    has_more_rows := must sqlite::step(query)
+    test::suite_assert(ts, not has_more_rows, site())
+    must sqlite::finalize(query)
+    must sqlite::close(database)
+end
+
+func run_tests(ts):
+    test_open_and_exec(ts)
+    test_prepared_statement(ts)
+end
+
+func main():
+    ts := test::suite_new(_)
+    run_tests(ts)
+    test::suite_finish(ts)
+end

@@ -1,0 +1,5 @@
+- implementation and docs for the Jik programming languages are here: D:\dev\jik-lang\jik
+- if unsure, search there or ask me
+- do not use works "intentionally" and "hardening" in the docs
+- code should be as simple as possible
+- if unsure about regions, ask me

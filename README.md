@@ -12,6 +12,7 @@ The Jik compiler and command-line toolchain can be found [here](https://github.c
 - [`csv`](packages/csv) - CSV parser
 - [`raylib`](packages/raylib) - Small 2D raylib wrapper
 - [`toml`](packages/toml) - TOML parser
+- [`sqlite`](packages/sqlite) - sqlite3 wrapper
 
 ## Compatibility
 

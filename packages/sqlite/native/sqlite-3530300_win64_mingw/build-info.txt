@@ -1,0 +1,11 @@
+﻿sqlite_version=3.53.3
+source_file=sqlite-amalgamation-3530300/sqlite3.c
+source_sha256=87497ab605bedd0dbee27a209c1eeff8c89b229b13f921a7efdbb81a13f779fd
+archive_file=lib/libsqlite3.a
+archive_sha256=c0d540f06fda82fd3395ce3be8ce913d7dc8251fc8bdd0af494c471741a2016e
+target=x86_64-w64-mingw32
+compiler=gcc.exe (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r3) 16.1.0
+archiver=GNU ar (Binutils for MinGW-W64 x86_64, built by Brecht Sanders, r3) 2.46.1
+compile_flags=-O2 -DSQLITE_OMIT_LOAD_EXTENSION
+host=Microsoft Windows 10.0.26200
+built_at_utc=2026-07-23T08:38:22Z

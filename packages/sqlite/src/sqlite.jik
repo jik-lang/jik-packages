@@ -1,0 +1,374 @@
+//! Small SQLite wrapper for Jik.
+
+@platform(windows)
+@includedir("../native/sqlite-amalgamation-3530300")
+@libdir("../native/sqlite-3530300_win64_mingw/lib")
+@link(":libsqlite3.a")
+
+@platform(linux)
+@includedir("../native/sqlite-amalgamation-3530300")
+@libdir("../native/sqlite-3530300_linux_amd64/lib")
+@link(":libsqlite3.a", "pthread")
+
+
+/// Opaque SQLite database connection.
+///
+/// Create it with `open` and close it with `close` after finalizing every statement created from it.
+extern struct jik_sqlite_database as Database
+
+/// Opaque prepared SQLite statement and query cursor.
+///
+/// Create it with `prepare`, bind its one-based `?` parameters, and call `step`.
+/// Each `step` that returns `true` makes one result row available through the zero-based `column_*` functions. When `step` returns `false`, the statement is complete.
+/// Call `finalize` before closing the database. Statement reset and reuse are not supported. BLOB values are not supported.
+extern struct jik_sqlite_statement as Statement
+
+/// Open a SQLite database file.
+///
+/// Pass `":memory:"` to create a database that exists only until it is closed.
+///
+/// @param path Database file path or `":memory:"`.
+/// @param region Allocation region for the returned handle.
+/// @returns Open database handle.
+extern throws func jik_sqlite_open as
+    open(foreign path: String, region: Region) -> Database
+
+/// Execute SQL directly and discard any result rows.
+///
+/// Use this for schema changes, direct inserts or updates, and transaction SQL such as `begin`, `commit`, and `rollback`.
+/// Use `prepare` for a `select` query or whenever a value comes from outside the SQL string.
+///
+/// @param database Open database handle.
+/// @param sql SQL to execute.
+extern throws func jik_sqlite_exec as
+    exec(database: Database, foreign sql: String) -> void
+
+/// Compile one SQL statement for parameter binding or reading result rows.
+///
+/// Use `?` placeholders for values that will be supplied with `bind_*`.
+/// Finalize the returned statement before closing `database`.
+///
+/// @param database Open database handle.
+/// @param sql One SQL statement, optionally with `?` placeholders.
+/// @param region Allocation region for the returned handle.
+/// @returns Open prepared statement.
+extern throws func jik_sqlite_prepare as
+    prepare(database: Database, foreign sql: String, region: Region) -> Statement
+
+/// Bind SQL NULL to a one-based statement parameter index.
+///
+/// @param statement Open prepared statement.
+/// @param index One-based `?` placeholder index.
+extern throws func jik_sqlite_bind_null as
+    bind_null(statement: Statement, index: int) -> void
+
+/// Bind an integer to a one-based statement parameter index.
+///
+/// @param statement Open prepared statement.
+/// @param index One-based `?` placeholder index.
+/// @param value Integer value to bind.
+extern throws func jik_sqlite_bind_int as
+    bind_int(statement: Statement, index: int, value: int) -> void
+
+/// Bind a floating-point value to a one-based statement parameter index.
+///
+/// @param statement Open prepared statement.
+/// @param index One-based `?` placeholder index.
+/// @param value Floating-point value to bind.
+extern throws func jik_sqlite_bind_float as
+    bind_float(statement: Statement, index: int, value: double) -> void
+
+/// Bind text to a one-based statement parameter index.
+///
+/// SQLite copies the text value before this function returns.
+///
+/// @param statement Open prepared statement.
+/// @param index One-based `?` placeholder index.
+/// @param value Text value to bind.
+extern throws func jik_sqlite_bind_text as
+    bind_text(statement: Statement, index: int, foreign value: String) -> void
+
+/// Execute a statement or advance it to its next result row.
+///
+/// `false` is the normal successful result for insert, update, and delete statements.
+///
+/// @param statement Open prepared statement.
+/// @returns `true` when a result row is available for `column_*` calls; `false` when execution is complete.
+extern throws func jik_sqlite_step as
+    step(statement: Statement) -> bool
+
+/// Return whether a zero-based result column in the current row is SQL NULL.
+///
+/// Call this after `step` returned `true` and before reading a nullable value.
+///
+/// @param statement Statement positioned on a result row.
+/// @param index Zero-based selected-column index.
+extern throws func jik_sqlite_column_is_null as
+    column_is_null(statement: Statement, index: int) -> bool
+
+/// Read a zero-based integer result column in the current row.
+///
+/// Jik integers are 32-bit; this throws if SQLite's integer is out of range.
+///
+/// @param statement Statement positioned on a result row.
+/// @param index Zero-based selected-column index.
+/// @returns Integer value.
+extern throws func jik_sqlite_column_int as
+    column_int(statement: Statement, index: int) -> int
+
+/// Read a zero-based floating-point result column in the current row.
+///
+/// @param statement Statement positioned on a result row.
+/// @param index Zero-based selected-column index.
+/// @returns Floating-point value.
+extern throws func jik_sqlite_column_float as
+    column_float(statement: Statement, index: int) -> double
+
+/// Read a zero-based text result column in the current row.
+/// Call `column_is_null` first when SQL NULL must be distinguished from an empty string.
+///
+/// @param statement Statement positioned on a result row.
+/// @param index Zero-based selected-column index.
+/// @param region Allocation region for the returned string.
+/// @returns Text value.
+extern throws func jik_sqlite_column_text as
+    column_text(statement: Statement, index: int, region: Region) -> String
+
+/// Release a prepared statement and its native SQLite resources.
+///
+/// A finalized statement cannot be used again.
+///
+/// @param statement Open prepared statement.
+extern throws func jik_sqlite_finalize as
+    finalize(statement: Statement) -> void
+
+/// Close a database connection.
+///
+/// Finalize every statement created from the database first. A closed database cannot be used again.
+///
+/// @param database Open database handle.
+extern throws func jik_sqlite_close as
+    close(database: Database) -> void
+
+
+@embed{SQLITE_C_END}
+
+#include "sqlite3.h"
+
+typedef struct jik_sqlite_database {
+    sqlite3 *handle;
+    bool     open;
+} jik_sqlite_database;
+
+typedef struct jik_sqlite_statement {
+    sqlite3_stmt *handle;
+    bool         open;
+} jik_sqlite_statement;
+
+static void
+jik_sqlite_set_error(JikError *error, sqlite3 *database, const char *fallback)
+{
+    const char *message = database ? sqlite3_errmsg(database) : fallback;
+    jik_error_set(error, 1, (char *)(message ? message : fallback));
+}
+
+jik_sqlite_database *
+jik_sqlite_open(JikString *path, JikRegion *region, JikError *error)
+{
+    jik_sqlite_database *database = jik_region_alloc(region, sizeof(jik_sqlite_database));
+    database->handle = NULL;
+    database->open   = false;
+
+    int result = sqlite3_open(path->data, &database->handle);
+    if (result != 0) {
+        jik_sqlite_set_error(error, database->handle, "sqlite: could not open database");
+        if (database->handle) {
+            sqlite3_close(database->handle);
+            database->handle = NULL;
+        }
+        return database;
+    }
+
+    database->open = true;
+    return database;
+}
+
+void
+jik_sqlite_exec(jik_sqlite_database *database, JikString *sql, JikError *error)
+{
+    if (!database->open) {
+        jik_error_set(error, 1, "sqlite: database is closed");
+        return;
+    }
+
+    char *message = NULL;
+    int result = sqlite3_exec(database->handle, sql->data, NULL, NULL, &message);
+    if (result != 0) {
+        jik_error_set(error, 1, message ? message : (char *)sqlite3_errmsg(database->handle));
+        if (message) {
+            sqlite3_free(message);
+        }
+    }
+}
+
+static bool
+jik_sqlite_statement_require_open(jik_sqlite_statement *statement, JikError *error)
+{
+    if (!statement->open) {
+        jik_error_set(error, 1, "sqlite: statement is finalized");
+        return false;
+    }
+    return true;
+}
+
+static bool
+jik_sqlite_column_require_current_row(jik_sqlite_statement *statement, int index, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) {
+        return false;
+    }
+    if (index < 0 || index >= sqlite3_data_count(statement->handle)) {
+        jik_error_set(error, 1, "sqlite: column index is invalid or there is no current row");
+        return false;
+    }
+    return true;
+}
+
+jik_sqlite_statement *
+jik_sqlite_prepare(jik_sqlite_database *database, JikString *sql, JikRegion *region, JikError *error)
+{
+    jik_sqlite_statement *statement = jik_region_alloc(region, sizeof(jik_sqlite_statement));
+    statement->handle = NULL;
+    statement->open   = false;
+
+    if (!database->open) {
+        jik_error_set(error, 1, "sqlite: database is closed");
+        return statement;
+    }
+
+    int result = sqlite3_prepare_v2(database->handle, sql->data, -1, &statement->handle, NULL);
+    if (result != SQLITE_OK) {
+        jik_sqlite_set_error(error, database->handle, "sqlite: could not prepare statement");
+        if (statement->handle) {
+            sqlite3_finalize(statement->handle);
+            statement->handle = NULL;
+        }
+        return statement;
+    }
+
+    statement->open = true;
+    return statement;
+}
+
+void
+jik_sqlite_bind_null(jik_sqlite_statement *statement, int index, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) return;
+    if (sqlite3_bind_null(statement->handle, index) != SQLITE_OK)
+        jik_sqlite_set_error(error, sqlite3_db_handle(statement->handle), "sqlite: could not bind NULL");
+}
+
+void
+jik_sqlite_bind_int(jik_sqlite_statement *statement, int index, int value, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) return;
+    if (sqlite3_bind_int(statement->handle, index, value) != SQLITE_OK)
+        jik_sqlite_set_error(error, sqlite3_db_handle(statement->handle), "sqlite: could not bind integer");
+}
+
+void
+jik_sqlite_bind_float(jik_sqlite_statement *statement, int index, double value, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) return;
+    if (sqlite3_bind_double(statement->handle, index, value) != SQLITE_OK)
+        jik_sqlite_set_error(error, sqlite3_db_handle(statement->handle), "sqlite: could not bind float");
+}
+
+void
+jik_sqlite_bind_text(jik_sqlite_statement *statement, int index, JikString *value, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) return;
+    if (sqlite3_bind_text(statement->handle, index, value->data, (int)value->size, SQLITE_TRANSIENT) != SQLITE_OK)
+        jik_sqlite_set_error(error, sqlite3_db_handle(statement->handle), "sqlite: could not bind text");
+}
+
+bool
+jik_sqlite_step(jik_sqlite_statement *statement, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) return false;
+
+    int result = sqlite3_step(statement->handle);
+    if (result == SQLITE_ROW) return true;
+    if (result == SQLITE_DONE) return false;
+
+    jik_sqlite_set_error(error, sqlite3_db_handle(statement->handle), "sqlite: could not step statement");
+    return false;
+}
+
+bool
+jik_sqlite_column_is_null(jik_sqlite_statement *statement, int index, JikError *error)
+{
+    if (!jik_sqlite_column_require_current_row(statement, index, error)) return true;
+    return sqlite3_column_type(statement->handle, index) == SQLITE_NULL;
+}
+
+int
+jik_sqlite_column_int(jik_sqlite_statement *statement, int index, JikError *error)
+{
+    if (!jik_sqlite_column_require_current_row(statement, index, error)) return 0;
+
+    sqlite3_int64 value = sqlite3_column_int64(statement->handle, index);
+    if (value < INT32_MIN || value > INT32_MAX) {
+        jik_error_set(error, 1, "sqlite: integer column is outside Jik's 32-bit integer range");
+        return 0;
+    }
+    return (int)value;
+}
+
+double
+jik_sqlite_column_float(jik_sqlite_statement *statement, int index, JikError *error)
+{
+    if (!jik_sqlite_column_require_current_row(statement, index, error)) return 0;
+    return sqlite3_column_double(statement->handle, index);
+}
+
+JikString *
+jik_sqlite_column_text(jik_sqlite_statement *statement, int index, JikRegion *region, JikError *error)
+{
+    if (!jik_sqlite_column_require_current_row(statement, index, error)) return jik_string_new("", region);
+
+    const unsigned char *value = sqlite3_column_text(statement->handle, index);
+    return jik_string_new((char *)(value ? value : (const unsigned char *)""), region);
+}
+
+void
+jik_sqlite_finalize(jik_sqlite_statement *statement, JikError *error)
+{
+    if (!jik_sqlite_statement_require_open(statement, error)) return;
+
+    int result = sqlite3_finalize(statement->handle);
+    statement->handle = NULL;
+    statement->open   = false;
+    if (result != SQLITE_OK)
+        jik_error_set(error, 1, "sqlite: could not finalize statement");
+}
+
+void
+jik_sqlite_close(jik_sqlite_database *database, JikError *error)
+{
+    if (!database->open) {
+        jik_error_set(error, 1, "sqlite: database is already closed");
+        return;
+    }
+
+    int result = sqlite3_close(database->handle);
+    if (result != 0) {
+        jik_sqlite_set_error(error, database->handle, "sqlite: could not close database");
+        return;
+    }
+
+    database->handle = NULL;
+    database->open   = false;
+}
+
+SQLITE_C_END

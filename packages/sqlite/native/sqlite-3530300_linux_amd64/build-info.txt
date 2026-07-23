@@ -1,0 +1,11 @@
+sqlite_version=3.53.3
+source_file=sqlite-amalgamation-3530300/sqlite3.c
+source_sha256=87497ab605bedd0dbee27a209c1eeff8c89b229b13f921a7efdbb81a13f779fd
+archive_file=lib/libsqlite3.a
+archive_sha256=629a0782059b600b83edf0eb32c4ab589e56a8e450c546cc1cc179734b645250
+target=x86_64-linux-gnu
+compiler=gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+archiver=GNU ar (GNU Binutils for Ubuntu) 2.42
+compile_flags=-O2 -DSQLITE_OMIT_LOAD_EXTENSION
+host=Linux 6.18.33.2-microsoft-standard-WSL2 x86_64 GNU/Linux
+built_at_utc=2026-07-23T09:06:14Z
