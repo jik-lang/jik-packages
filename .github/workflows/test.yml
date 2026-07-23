@@ -129,9 +129,15 @@ jobs:
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
+          location: C:\msys64
           msystem: MINGW64
           update: true
           install: mingw-w64-x86_64-gcc
+
+      - name: Add MinGW-w64 GCC to PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_PATH -Value 'C:\msys64\mingw64\bin'
 
       - name: Check Jik version
         run: jik version
@@ -142,7 +148,6 @@ jobs:
 
       - name: Run tests
         if: runner.os == 'Windows'
-        shell: msys2 {0}
         env:
           JIK_CC: gcc
         run: jik run test/tests.jik
