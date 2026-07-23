@@ -6,6 +6,13 @@ Official packages for the [Jik programming language](https://jik-lang.org).
 
 The Jik compiler and command-line toolchain can be found [here](https://github.com/jik-lang/jik).
 
+## Packages
+
+- [`argparse`](packages/argparse) - command-line argument parser
+- [`csv`](packages/csv) - CSV parser
+- [`raylib`](packages/raylib) - Small 2D raylib wrapper
+- [`toml`](packages/toml) - TOML parser
+
 ## Compatibility
 
 This package set requires Jik >= 0.1.0-alpha.9.
@@ -40,13 +47,6 @@ For example, `use "pkg/toml"` resolves to:
 
 Run `jik env` to check the resolved package path. It is printed as
 `pkg_path=<path>`.
-
-## Packages
-
-- [`argparse`](packages/argparse) - command-line argument parser
-- [`csv`](packages/csv) - CSV parser
-- [`raylib`](packages/raylib) - Small 2D raylib wrapper
-- [`toml`](packages/toml) - TOML parser
 
 ## Testing
 
