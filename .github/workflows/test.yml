@@ -9,14 +9,19 @@ permissions:
 
 jobs:
   test:
-    name: Run package tests
-    runs-on: ubuntu-latest
+    name: Run package tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install latest Jik release
+        if: runner.os == 'Linux'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,6 +81,49 @@ jobs:
           fi
 
           echo "$(dirname "$jik_bin")" >> "$GITHUB_PATH"
+
+      - name: Install latest Jik release
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $releaseDir = Join-Path $env:RUNNER_TEMP 'jik-release'
+          $extractDir = Join-Path $env:RUNNER_TEMP 'jik-extract'
+          New-Item -ItemType Directory -Force -Path $releaseDir, $extractDir | Out-Null
+
+          gh release download --repo jik-lang/jik --pattern '*' --dir $releaseDir --clobber
+
+          $assets = Get-ChildItem -Path $releaseDir -File
+          $asset = $assets | Where-Object {
+            $_.Name -match 'windows|win' -and $_.Name -match 'x86_64|amd64|x64'
+          } | Select-Object -First 1
+
+          if (-not $asset) {
+            $asset = $assets | Where-Object { $_.Name -match 'windows|win' } | Select-Object -First 1
+          }
+
+          if (-not $asset) {
+            Write-Error 'Latest jik-lang/jik release has no Windows release asset.'
+            $assets | Select-Object -ExpandProperty FullName
+            exit 1
+          }
+
+          switch -Regex ($asset.Name) {
+            '\.zip$' { Expand-Archive -Path $asset.FullName -DestinationPath $extractDir -Force }
+            default { Write-Error "Unsupported Jik release asset format: $($asset.Name)"; exit 1 }
+          }
+
+          $jikBin = Get-ChildItem -Path $extractDir -Recurse -File -Filter 'jik.exe' | Select-Object -First 1
+          if (-not $jikBin) {
+            Write-Error "Downloaded Jik release asset does not contain an executable named 'jik.exe'."
+            Get-ChildItem -Path $extractDir -Recurse -File | Select-Object -ExpandProperty FullName
+            exit 1
+          }
+
+          Split-Path -Parent $jikBin.FullName | Add-Content -Path $env:GITHUB_PATH
 
       - name: Check Jik version
         run: jik version
