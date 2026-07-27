@@ -5,6 +5,10 @@ func run_tests(ts):
     test::suite_assert(ts, raylib::WHITE.r == 255, site())
     test::suite_assert(ts, raylib::WHITE.a == 255, site())
     test::suite_assert(ts, raylib::KEY_ESCAPE == 256, site())
+    test::suite_assert(ts, raylib::KEY_A == 65, site())
+    test::suite_assert(ts, raylib::KEY_F12 == 301, site())
+    test::suite_assert(ts, raylib::KEY_KP_ENTER == 335, site())
+    test::suite_assert(ts, raylib::KEY_RIGHT_SUPER == 347, site())
     test::suite_assert(ts, raylib::MOUSE_BUTTON_LEFT == 0, site())
     sound := raylib::Sound{}
     test::suite_assert(ts, not raylib::is_sound_valid(sound), site())

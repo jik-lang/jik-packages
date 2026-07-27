@@ -78,7 +78,7 @@ The package currently defines:
 | Category | Constants |
 |---|---|
 | Colors | `WHITE`, `BLACK`, `RED`, `GREEN`, `BLUE`, `YELLOW`, `RAYWHITE`, `LIGHTGRAY`, `DARKGRAY` |
-| Keys | `KEY_SPACE`, `KEY_W`, `KEY_S`, `KEY_ESCAPE`, `KEY_ENTER`, `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN` |
+| Keys | All raylib 6.0 `KeyboardKey` values: alphanumeric and punctuation keys, navigation and function keys, keypad keys, modifiers, and Android buttons. |
 | Mouse buttons | `MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_RIGHT`, `MOUSE_BUTTON_MIDDLE` |
 
 ## Window and frame lifecycle
