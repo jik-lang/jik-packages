@@ -201,8 +201,8 @@ Input operations come from raylib's `rcore` module.
 
 ## Audio
 
-Audio operations correspond to raylib's `raudio` module and currently support
-short sound effects, not music streaming.
+Audio operations correspond to raylib's `raudio` module and support short sound
+effects and streamed background music.
 
 | Jik API | Native raylib | Wrapper behavior |
 |---|---|---|
@@ -215,6 +215,17 @@ short sound effects, not music streaming.
 | `play_sound(sound)` | [`PlaySound`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1684) | Plays valid handles; invalid handles are no-ops. |
 | `set_sound_volume(sound, volume)` | [`SetSoundVolume`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1689) | Converts the Jik `double` volume to native `float`; invalid handles are no-ops. |
 | `unload_sound(sound)` | [`UnloadSound`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1678) | Unloads a valid sound once and marks the shared handle invalid. |
+| `Music{}` | None | Creates an unloaded region-allocated music handle. |
+| `load_music(path, region) -> Music` | [`LoadMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1699) | Opens a streamed music file after the audio device is initialized. |
+| `is_music_valid(music) -> bool` | [`IsMusicValid`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1701) | Reports whether loading succeeded. |
+| `play_music(music)` / `stop_music(music)` | [`PlayMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1703) / [`StopMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1706) | Starts or stops valid music. |
+| `update_music_stream(music)` | [`UpdateMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1705) | Refills streamed audio buffers; call once per game-loop iteration. |
+| `pause_music(music)` / `resume_music(music)` | [`PauseMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1707) / [`ResumeMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1708) | Pauses or resumes valid music. |
+| `is_music_playing(music) -> bool` | [`IsMusicStreamPlaying`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1704) | Reports current playback state. |
+| `set_music_looping(music, looping)` | `Music.looping` | Enables or disables looping. |
+| `set_music_volume(music, volume)` | [`SetMusicVolume`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1710) | Sets volume; `1.0` is maximum. |
+| `music_time_length(music) -> double` / `music_time_played(music) -> double` | [`GetMusicTimeLength`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1713) / [`GetMusicTimePlayed`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1714) | Returns seconds, or `0.0` for an invalid handle. |
+| `unload_music(music)` | [`UnloadMusicStream`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1702) | Unloads valid music once and marks the shared handle invalid. |
 
 Initialize the audio device before loading sounds. Unload every loaded sound
 before closing the audio device. If the device or sound file is unavailable,
@@ -222,6 +233,11 @@ the returned handle is invalid and playback is a no-op.
 
 Copies of a `Sound` value refer to the same opaque handle. Unloading through
 one copy also invalidates the other copies.
+
+`Music` copies have the same shared-handle behavior. After `play_music`, call
+`update_music_stream` once per game-loop iteration, even while no drawing is
+required; without it, streaming playback will stall. Call `unload_music` before
+closing the audio device.
 
 ## Native build
 

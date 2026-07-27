@@ -32,11 +32,10 @@ This package provides:
 - texture loading, point filtering, and source/destination rectangle drawing
 - default-font text drawing and measurement
 - keyboard and mouse polling
-- short sound loading and playback
+- short sound effects and streamed background music
 - common colors and input constants
 
-It does not expose CPU-side image manipulation, custom-font, music-streaming,
-or 3D APIs.
+It does not expose CPU-side image manipulation, custom-font, or 3D APIs.
 
 Import it with:
 
@@ -79,6 +78,15 @@ tilesets and spritesheets:
 
 ```sh
 jik run packages/raylib/examples/texture_demo.jik
+```
+
+### Music streaming
+
+The music example includes a CC0 OGG loop and shows the required streaming
+update call and Space-based pause/resume control:
+
+```sh
+jik run packages/raylib/examples/music_stream.jik
 ```
 
 ### Pong

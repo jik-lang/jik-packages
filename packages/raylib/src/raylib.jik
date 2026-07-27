@@ -35,6 +35,7 @@ struct Rectangle:
 end
 
 extern struct jik_raylib_sound as Sound
+extern struct jik_raylib_music as Music
 extern struct jik_raylib_texture as Texture
 
 WHITE := Color{r = 255, g = 255, b = 255, a = 255}
@@ -396,6 +397,105 @@ jik_raylib_unload_sound(jik_raylib_sound *sound)
     }
 }
 
+typedef struct jik_raylib_music {
+    Music value;
+    bool loaded;
+} jik_raylib_music;
+
+static jik_raylib_music *
+jik_raylib_music_new(JikRegion *region)
+{
+    jik_raylib_music *music = jik_region_alloc(region, sizeof(jik_raylib_music));
+    music->loaded = false;
+    return music;
+}
+
+static jik_raylib_music *
+jik_raylib_load_music(JikString *path, JikRegion *region)
+{
+    jik_raylib_music *music = jik_raylib_music_new(region);
+    if (IsAudioDeviceReady()) {
+        music->value = LoadMusicStream(jik_raylib_find_asset(path, region));
+        music->loaded = IsMusicValid(music->value);
+    }
+    return music;
+}
+
+static bool
+jik_raylib_is_music_valid(jik_raylib_music *music)
+{
+    return music->loaded;
+}
+
+static void
+jik_raylib_play_music(jik_raylib_music *music)
+{
+    if (music->loaded) PlayMusicStream(music->value);
+}
+
+static bool
+jik_raylib_is_music_playing(jik_raylib_music *music)
+{
+    return music->loaded && IsMusicStreamPlaying(music->value);
+}
+
+static void
+jik_raylib_update_music(jik_raylib_music *music)
+{
+    if (music->loaded) UpdateMusicStream(music->value);
+}
+
+static void
+jik_raylib_stop_music(jik_raylib_music *music)
+{
+    if (music->loaded) StopMusicStream(music->value);
+}
+
+static void
+jik_raylib_pause_music(jik_raylib_music *music)
+{
+    if (music->loaded) PauseMusicStream(music->value);
+}
+
+static void
+jik_raylib_resume_music(jik_raylib_music *music)
+{
+    if (music->loaded) ResumeMusicStream(music->value);
+}
+
+static void
+jik_raylib_set_music_looping(jik_raylib_music *music, bool looping)
+{
+    if (music->loaded) music->value.looping = looping;
+}
+
+static void
+jik_raylib_set_music_volume(jik_raylib_music *music, double volume)
+{
+    if (music->loaded) SetMusicVolume(music->value, (float)volume);
+}
+
+static double
+jik_raylib_music_time_length(jik_raylib_music *music)
+{
+    return music->loaded ? (double)GetMusicTimeLength(music->value) : 0.0;
+}
+
+static double
+jik_raylib_music_time_played(jik_raylib_music *music)
+{
+    return music->loaded ? (double)GetMusicTimePlayed(music->value) : 0.0;
+}
+
+static void
+jik_raylib_unload_music(jik_raylib_music *music)
+{
+    if (music->loaded) {
+        UnloadMusicStream(music->value);
+        music->loaded = false;
+    }
+}
+
 typedef struct jik_raylib_texture {
     Texture2D value;
     bool loaded;
@@ -555,6 +655,24 @@ extern func jik_raylib_play_sound as play_sound(sound: Sound) -> void
 extern func jik_raylib_set_sound_volume as
     set_sound_volume(sound: Sound, volume: double) -> void
 extern func jik_raylib_unload_sound as unload_sound(sound: Sound) -> void
+
+extern init func jik_raylib_music_new as empty_music(region: Region) -> Music
+extern func jik_raylib_load_music as
+    load_music(foreign path: String, region: Region) -> Music
+extern func jik_raylib_is_music_valid as is_music_valid(music: Music) -> bool
+extern func jik_raylib_play_music as play_music(music: Music) -> void
+extern func jik_raylib_is_music_playing as is_music_playing(music: Music) -> bool
+extern func jik_raylib_update_music as update_music_stream(music: Music) -> void
+extern func jik_raylib_stop_music as stop_music(music: Music) -> void
+extern func jik_raylib_pause_music as pause_music(music: Music) -> void
+extern func jik_raylib_resume_music as resume_music(music: Music) -> void
+extern func jik_raylib_set_music_looping as
+    set_music_looping(music: Music, looping: bool) -> void
+extern func jik_raylib_set_music_volume as
+    set_music_volume(music: Music, volume: double) -> void
+extern func jik_raylib_music_time_length as music_time_length(music: Music) -> double
+extern func jik_raylib_music_time_played as music_time_played(music: Music) -> double
+extern func jik_raylib_unload_music as unload_music(music: Music) -> void
 
 extern init func jik_raylib_texture_new as empty_texture(region: Region) -> Texture
 extern func jik_raylib_load_texture as
