@@ -20,6 +20,11 @@ func run_tests(ts):
     test::suite_assert(ts, not raylib::is_texture_valid(texture), site())
     test::suite_assert(ts, raylib::texture_width(texture) == 0, site())
     test::suite_assert(ts, raylib::texture_height(texture) == 0, site())
+    font := raylib::Font{}
+    test::suite_assert(ts, not raylib::is_font_valid(font), site())
+    size := raylib::measure_font_text(font, "test", 24.0, 1.0, _)
+    test::suite_assert(ts, size.x == 0.0, site())
+    test::suite_assert(ts, size.y == 0.0, site())
 end
 
 func main():

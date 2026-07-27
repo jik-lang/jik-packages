@@ -37,6 +37,7 @@ end
 extern struct jik_raylib_sound as Sound
 extern struct jik_raylib_music as Music
 extern struct jik_raylib_texture as Texture
+extern struct jik_raylib_font as Font
 
 WHITE := Color{r = 255, g = 255, b = 255, a = 255}
 BLACK := Color{r = 0, g = 0, b = 0, a = 255}
@@ -308,6 +309,78 @@ static int
 jik_raylib_measure_text(JikString *text, int size)
 {
     return MeasureText(text->data, size);
+}
+
+static const char *
+jik_raylib_find_asset(JikString *path, JikRegion *region);
+
+typedef struct jik_raylib_font {
+    Font value;
+    bool loaded;
+} jik_raylib_font;
+
+static jik_raylib_font *
+jik_raylib_font_new(JikRegion *region)
+{
+    jik_raylib_font *font = jik_region_alloc(region, sizeof(jik_raylib_font));
+    font->value = (Font){0};
+    font->loaded = false;
+    return font;
+}
+
+static jik_raylib_font *
+jik_raylib_load_font(JikString *path, JikRegion *region)
+{
+    jik_raylib_font *font = jik_raylib_font_new(region);
+    if (IsWindowReady()) {
+        font->value = LoadFont(jik_raylib_find_asset(path, region));
+        font->loaded = IsFontValid(font->value);
+    }
+    return font;
+}
+
+static bool
+jik_raylib_is_font_valid(jik_raylib_font *font)
+{
+    return font->loaded;
+}
+
+static void
+jik_raylib_draw_font_text(jik_raylib_font *font, JikString *text,
+                          double x, double y, double size, double spacing,
+                          int r, int g, int b, int a)
+{
+    if (font->loaded) {
+        DrawTextEx(font->value, text->data, jik_raylib_vector2(x, y),
+                   (float)size, (float)spacing, jik_raylib_color(r, g, b, a));
+    }
+}
+
+static double
+jik_raylib_measure_font_text_width(jik_raylib_font *font, JikString *text,
+                                   double size, double spacing)
+{
+    if (!font->loaded) return 0.0;
+    return (double)MeasureTextEx(font->value, text->data,
+                                 (float)size, (float)spacing).x;
+}
+
+static double
+jik_raylib_measure_font_text_height(jik_raylib_font *font, JikString *text,
+                                    double size, double spacing)
+{
+    if (!font->loaded) return 0.0;
+    return (double)MeasureTextEx(font->value, text->data,
+                                 (float)size, (float)spacing).y;
+}
+
+static void
+jik_raylib_unload_font(jik_raylib_font *font)
+{
+    if (font->loaded) {
+        UnloadFont(font->value);
+        font->loaded = false;
+    }
 }
 
 static double
@@ -634,6 +707,22 @@ extern func jik_raylib_draw_text as
 extern func jik_raylib_measure_text as
     measure_text(text: String, size: int) -> int
 
+extern init func jik_raylib_font_new as empty_font(region: Region) -> Font
+extern func jik_raylib_load_font as
+    load_font(foreign path: String, region: Region) -> Font
+extern func jik_raylib_is_font_valid as is_font_valid(font: Font) -> bool
+extern func jik_raylib_draw_font_text as
+    _draw_font_text(font: Font, foreign text: String, x: double, y: double,
+                    size: double, spacing: double,
+                    r: int, g: int, b: int, a: int) -> void
+extern func jik_raylib_measure_font_text_width as
+    _measure_font_text_width(font: Font, foreign text: String,
+                             size: double, spacing: double) -> double
+extern func jik_raylib_measure_font_text_height as
+    _measure_font_text_height(font: Font, foreign text: String,
+                              size: double, spacing: double) -> double
+extern func jik_raylib_unload_font as unload_font(font: Font) -> void
+
 extern func IsKeyPressed as is_key_pressed(key: int) -> bool
 extern func IsKeyDown as is_key_down(key: int) -> bool
 extern func IsKeyReleased as is_key_released(key: int) -> bool
@@ -726,6 +815,20 @@ end
 
 func draw_text(foreign text: String, x: int, y: int, size: int, foreign color: Color):
     _draw_text(text, x, y, size, color.r, color.g, color.b, color.a)
+end
+
+func draw_font_text(font: Font, foreign text: String, foreign x: double, foreign y: double,
+                    foreign size: double, foreign spacing: double, foreign color: Color):
+    _draw_font_text(font, text, x, y, size, spacing,
+                    color.r, color.g, color.b, color.a)
+end
+
+func measure_font_text(font: Font, foreign text: String,
+                       foreign size: double, foreign spacing: double, r: Region) -> Vector2:
+    return Vector2{
+        x = _measure_font_text_width(font, text, size, spacing),
+        y = _measure_font_text_height(font, text, size, spacing)
+    }[r]
 end
 
 func draw_texture_rect(texture: Texture, foreign source: Rectangle,

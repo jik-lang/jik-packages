@@ -14,8 +14,8 @@ links raylib 6.0, so applications do not need a separate raylib library beside
 the executable.
 
 The wrapper exposes 2D windows, drawing, texture loading and drawing, input,
-and short sound effects. It does not expose CPU-side raylib `Image` editing,
-custom fonts, music streaming, or 3D APIs yet.
+custom fonts, and audio playback. It does not expose CPU-side raylib `Image`
+editing or 3D APIs yet.
 
 ## Relationship to raylib
 
@@ -66,10 +66,10 @@ end
 These are Jik values converted at the native boundary; they are not binary
 copies of raylib's C structs.
 
-`Sound` and `Texture` are opaque handles for native raylib resources.
-`Sound{}` and `Texture{}` create unloaded handles on which their resource
-operations are safe no-ops. Loaded sounds and textures must still be released
-explicitly with `unload_sound` and `unload_texture`.
+`Sound`, `Texture`, and `Font` are opaque handles for native raylib resources.
+Their empty values create unloaded handles on which resource operations are safe
+no-ops. Loaded resources must still be released explicitly with their matching
+`unload_*` function.
 
 ## Constants
 
@@ -132,6 +132,35 @@ correspond to `rtext`.
 | `draw_circle_lines(center, radius, color)` | [`DrawCircleLinesV`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1287) | Uses the vector outline form. |
 | `draw_text(text, x, y, size, color)` | [`DrawText`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1503) | Draws with raylib's default font. |
 | `measure_text(text, size) -> int` | [`MeasureText`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1511) | Measures text drawn with the default font. |
+
+## Fonts
+
+Custom fonts are GPU resources. Load a font after `init_window`, use it with
+the custom-font text operations, and unload it before `close_window`.
+
+| Jik API | Native raylib | Wrapper behavior |
+|---|---|---|
+| `Font{}` | None | Creates an unloaded opaque font handle. |
+| `load_font(path, region) -> Font` | [`LoadFont`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1490) | Loads a font file into GPU memory. As with textures, if the path is not found from the working directory, it is also tried beside the executable. |
+| `is_font_valid(font) -> bool` | [`IsFontValid`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1494) | Reports whether loading succeeded. |
+| `draw_font_text(font, text, x, y, size, spacing, color)` | [`DrawTextEx`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1504) | Draws valid fonts with fractional pixel size and glyph spacing; invalid handles are no-ops. |
+| `measure_font_text(font, text, size, spacing, region) -> Vector2` | [`MeasureTextEx`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1512) | Returns the text width in `x` and height in `y`; returns `(0.0, 0.0)` for an invalid handle. |
+| `unload_font(font)` | [`UnloadFont`](https://github.com/raysan5/raylib/blob/6.0/src/raylib.h#L1498) | Unloads a valid font once and marks the shared handle invalid. |
+
+```jik
+font := raylib::load_font("assets/ui.ttf", _)
+
+if raylib::is_font_valid(font):
+    size := raylib::measure_font_text(font, "Start", 32.0, 1.5, _)
+    raylib::draw_font_text(font, "Start", 40.0, 80.0, 32.0, 1.5, raylib::WHITE)
+end
+
+raylib::unload_font(font)
+```
+
+`Vector2` is used for measured text dimensions so its `x`/`y` fields remain
+useful for future vector-based APIs. Copies of a `Font` value share its native
+handle; unloading through one copy invalidates the others.
 
 For example, `draw_circle` wraps `DrawCircleV`, not `DrawCircle`, because the
 Jik API accepts a `Vector2` center:

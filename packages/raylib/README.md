@@ -30,12 +30,12 @@ This package provides:
 - window and frame lifecycle
 - basic 2D drawing
 - texture loading, point filtering, and source/destination rectangle drawing
-- default-font text drawing and measurement
+- default and custom-font text drawing and measurement
 - keyboard and mouse polling
 - short sound effects and streamed background music
 - common colors and input constants
 
-It does not expose CPU-side image manipulation, custom-font, or 3D APIs.
+It does not expose CPU-side image manipulation or 3D APIs.
 
 Import it with:
 
@@ -80,6 +80,15 @@ tilesets and spritesheets:
 jik run packages/raylib/examples/texture_demo.jik
 ```
 
+### Custom font demo
+
+The custom-font demo loads its bundled IBM Plex Mono font, centers text using
+`measure_font_text`, and draws it with custom glyph spacing:
+
+```sh
+jik run packages/raylib/examples/font_demo.jik
+```
+
 ### Music streaming
 
 The music example includes a CC0 OGG loop and shows the required streaming
@@ -118,3 +127,6 @@ See [the API reference](docs/api.md) for the complete exposed API.
 The Jik wrapper is released under this repository's [MIT License](../../LICENSE).
 The bundled raylib 6.0 native distribution is covered by the
 [raylib license](native/raylib-6.0_win64_mingw-w64/LICENSE).
+
+The custom-font example bundles IBM Plex Mono Regular under the
+[SIL Open Font License 1.1](examples/assets/IBMPlexMono-OFL.txt).
