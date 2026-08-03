@@ -2,11 +2,13 @@
 //! Bundled native libraries target Windows/MinGW and Linux/GCC.
 
 @platform(windows)
+@profile(windows-x64-mingw)
 @includedir("../native/raylib-6.0_win64_mingw-w64/include")
 @libdir("../native/raylib-6.0_win64_mingw-w64/lib")
 @link("raylib", "opengl32", "gdi32", "winmm")
 
 @platform(linux)
+@profile(linux-x64-gnu)
 @includedir("../native/raylib-6.0_linux_amd64/include")
 @libdir("../native/raylib-6.0_linux_amd64/lib")
 @link(":libraylib.a", "X11", "m", "pthread", "dl")

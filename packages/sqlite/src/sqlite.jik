@@ -1,11 +1,13 @@
 //! Small SQLite wrapper for Jik.
 
 @platform(windows)
+@profile(windows-x64-mingw)
 @includedir("../native/sqlite-amalgamation-3530300")
 @libdir("../native/sqlite-3530300_win64_mingw/lib")
 @link(":libsqlite3.a")
 
 @platform(linux)
+@profile(linux-x64-gnu)
 @includedir("../native/sqlite-amalgamation-3530300")
 @libdir("../native/sqlite-3530300_linux_amd64/lib")
 @link(":libsqlite3.a", "pthread")
