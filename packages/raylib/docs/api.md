@@ -8,7 +8,7 @@ use "pkg/raylib"
 
 ## Supported platform
 
-`pkg/raylib` requires Jik 0.1.0-alpha.12 or newer. It supports Windows and
+`pkg/raylib` requires Jik 0.1.0-alpha.27 or newer. It supports Windows and
 Linux x86-64 with MinGW-w64 GCC and GCC respectively. It bundles and statically
 links raylib 6.0, so applications do not need a separate raylib library beside
 the executable.

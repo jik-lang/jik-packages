@@ -5,7 +5,7 @@ Small 2D raylib wrapper for Jik.
 
 ## Requirements
 
-- Jik 0.1.0-alpha.12 or newer
+- Jik 0.1.0-alpha.27 or newer
 - Windows or Linux x86-64
 - MinGW-w64 GCC on Windows, or GCC on Linux
 

@@ -15,7 +15,7 @@ The Jik compiler and command-line toolchain can be found [here](https://github.c
 
 ## Compatibility
 
-This package set requires Jik >= 0.1.0-alpha.12.
+This package set requires Jik >= 0.1.0-alpha.27.
 
 ## Usage
 

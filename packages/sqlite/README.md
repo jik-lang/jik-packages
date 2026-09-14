@@ -10,7 +10,7 @@ separate SQLite DLL or shared library beside the executable.
 
 ## Requirements
 
-- Jik 0.1.0-alpha.12 or newer
+- Jik 0.1.0-alpha.27 or newer
 - Windows x86-64 with MinGW-w64 GCC, or Linux x86-64 with GCC
 
 ## Use
