@@ -211,11 +211,11 @@ end
 
 throws func _store_value(doc: TomlDocument, foreign table_name: String, foreign key: String, value: TomlValue):
     if len(table_name) > 0:
-        table := doc.tables[table_name]?
-        if table[key] is Some:
+        table_ := doc.tables[table_name]?
+        if table_[key] is Some:
             fail("toml: duplicate key")
         end
-        table[key] = value
+        table_[key] = value
     else:
         if doc.root[key] is Some:
             fail("toml: duplicate key")
@@ -255,8 +255,8 @@ throws func parse(foreign src: String, r: Region) -> TomlDocument:
                 if doc.tables[table_name] is Some:
                     fail("toml: duplicate table header")
                 end
-                table: Dict[TomlValue][r]
-                doc.tables[table_name] = table
+                table_: Dict[TomlValue][r]
+                doc.tables[table_name] = table_
                 current_table = table_name
             except:
                 fail(error_msg(r), error_code())

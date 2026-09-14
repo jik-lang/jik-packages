@@ -5,20 +5,20 @@ use "../src/toml"
 
 func _assert_int(ts, foreign value: Option[toml::TomlValue], expected: int):
     test::suite_assert(ts, value is Some, site())
-    test::suite_assert(ts, value? is toml::TomlValue.INT, site())
-    test::suite_assert(ts, value?[toml::TomlValue.INT] == expected, site())
+    test::suite_assert(ts, value? is INT, site())
+    test::suite_assert(ts, value?.INT == expected, site())
 end
 
 func _assert_string(ts, foreign value: Option[toml::TomlValue], foreign expected: String):
     test::suite_assert(ts, value is Some, site())
-    test::suite_assert(ts, value? is toml::TomlValue.STRING, site())
-    test::suite_assert(ts, value?[toml::TomlValue.STRING] == expected, site())
+    test::suite_assert(ts, value? is STRING, site())
+    test::suite_assert(ts, value?.STRING == expected, site())
 end
 
 func _assert_bool(ts, foreign value: Option[toml::TomlValue], expected: bool):
     test::suite_assert(ts, value is Some, site())
-    test::suite_assert(ts, value? is toml::TomlValue.BOOL, site())
-    test::suite_assert(ts, value?[toml::TomlValue.BOOL] == expected, site())
+    test::suite_assert(ts, value? is BOOL, site())
+    test::suite_assert(ts, value?.BOOL == expected, site())
 end
 
 func _assert_parse_fails(ts, foreign src: String):
